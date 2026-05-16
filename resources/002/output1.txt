@@ -1,0 +1,214 @@
+Epoch 1/100, Loss: 0.252908
+Model saved to cosine_model.h
+Epoch 2/100, Loss: 0.255237
+Epoch 3/100, Loss: 0.256773
+Epoch 4/100, Loss: 0.263653
+Epoch 5/100, Loss: 0.277157
+Epoch 6/100, Loss: 0.303602
+Epoch 7/100, Loss: 0.334989
+Epoch 8/100, Loss: 0.354356
+Epoch 9/100, Loss: 0.357233
+Epoch 10/100, Loss: 0.351569
+Epoch 11/100, Loss: 0.340914
+Epoch 12/100, Loss: 0.325098
+Epoch 13/100, Loss: 0.303962
+Epoch 14/100, Loss: 0.27564
+Epoch 15/100, Loss: 0.242673
+Model saved to cosine_model.h
+Epoch 16/100, Loss: 0.207797
+Model saved to cosine_model.h
+Epoch 17/100, Loss: 0.169304
+Model saved to cosine_model.h
+Epoch 18/100, Loss: 0.13686
+Model saved to cosine_model.h
+Epoch 19/100, Loss: 0.110837
+Model saved to cosine_model.h
+Epoch 20/100, Loss: 0.0917072
+Model saved to cosine_model.h
+Epoch 21/100, Loss: 0.0778961
+Model saved to cosine_model.h
+Epoch 22/100, Loss: 0.0675824
+Model saved to cosine_model.h
+Epoch 23/100, Loss: 0.0593905
+Model saved to cosine_model.h
+Epoch 24/100, Loss: 0.0526341
+Model saved to cosine_model.h
+Epoch 25/100, Loss: 0.0468784
+Model saved to cosine_model.h
+Epoch 26/100, Loss: 0.0419593
+Model saved to cosine_model.h
+Epoch 27/100, Loss: 0.0377009
+Model saved to cosine_model.h
+Epoch 28/100, Loss: 0.0340051
+Model saved to cosine_model.h
+Epoch 29/100, Loss: 0.0307803
+Model saved to cosine_model.h
+Epoch 30/100, Loss: 0.0279713
+Model saved to cosine_model.h
+Epoch 31/100, Loss: 0.025511
+Model saved to cosine_model.h
+Epoch 32/100, Loss: 0.0233657
+Model saved to cosine_model.h
+Epoch 33/100, Loss: 0.0214724
+Model saved to cosine_model.h
+Epoch 34/100, Loss: 0.0197991
+Model saved to cosine_model.h
+Epoch 35/100, Loss: 0.0183192
+Model saved to cosine_model.h
+Epoch 36/100, Loss: 0.0170155
+Model saved to cosine_model.h
+Epoch 37/100, Loss: 0.0158456
+Model saved to cosine_model.h
+Epoch 38/100, Loss: 0.0148113
+Model saved to cosine_model.h
+Epoch 39/100, Loss: 0.0138803
+Model saved to cosine_model.h
+Epoch 40/100, Loss: 0.0130531
+Model saved to cosine_model.h
+Epoch 41/100, Loss: 0.012303
+Model saved to cosine_model.h
+Epoch 42/100, Loss: 0.0116323
+Model saved to cosine_model.h
+Epoch 43/100, Loss: 0.0110214
+Model saved to cosine_model.h
+Epoch 44/100, Loss: 0.010474
+Model saved to cosine_model.h
+Epoch 45/100, Loss: 0.00997976
+Model saved to cosine_model.h
+Epoch 46/100, Loss: 0.00952886
+Model saved to cosine_model.h
+Epoch 47/100, Loss: 0.0091193
+Model saved to cosine_model.h
+Epoch 48/100, Loss: 0.00874679
+Model saved to cosine_model.h
+Epoch 49/100, Loss: 0.00840639
+Model saved to cosine_model.h
+Epoch 50/100, Loss: 0.00809777
+Model saved to cosine_model.h
+Epoch 51/100, Loss: 0.00781317
+Model saved to cosine_model.h
+Epoch 52/100, Loss: 0.00755274
+Model saved to cosine_model.h
+Epoch 53/100, Loss: 0.00731557
+Model saved to cosine_model.h
+Epoch 54/100, Loss: 0.00709817
+Model saved to cosine_model.h
+Epoch 55/100, Loss: 0.00689853
+Model saved to cosine_model.h
+Epoch 56/100, Loss: 0.00671428
+Model saved to cosine_model.h
+Epoch 57/100, Loss: 0.00654363
+Model saved to cosine_model.h
+Epoch 58/100, Loss: 0.0063864
+Model saved to cosine_model.h
+Epoch 59/100, Loss: 0.00624122
+Model saved to cosine_model.h
+Epoch 60/100, Loss: 0.00610697
+Model saved to cosine_model.h
+Epoch 61/100, Loss: 0.00598255
+Model saved to cosine_model.h
+Epoch 62/100, Loss: 0.00586721
+Model saved to cosine_model.h
+Epoch 63/100, Loss: 0.0057605
+Model saved to cosine_model.h
+Epoch 64/100, Loss: 0.00566131
+Model saved to cosine_model.h
+Epoch 65/100, Loss: 0.0055689
+Model saved to cosine_model.h
+Epoch 66/100, Loss: 0.00548358
+Model saved to cosine_model.h
+Epoch 67/100, Loss: 0.0054037
+Model saved to cosine_model.h
+Epoch 68/100, Loss: 0.00532999
+Model saved to cosine_model.h
+Epoch 69/100, Loss: 0.00526115
+Model saved to cosine_model.h
+Epoch 70/100, Loss: 0.00519674
+Model saved to cosine_model.h
+Epoch 71/100, Loss: 0.00513645
+Model saved to cosine_model.h
+Epoch 72/100, Loss: 0.00508086
+Model saved to cosine_model.h
+Epoch 73/100, Loss: 0.00502896
+Model saved to cosine_model.h
+Epoch 74/100, Loss: 0.00497997
+Model saved to cosine_model.h
+Epoch 75/100, Loss: 0.00493418
+Model saved to cosine_model.h
+Epoch 76/100, Loss: 0.00489061
+Model saved to cosine_model.h
+Epoch 77/100, Loss: 0.00485049
+Model saved to cosine_model.h
+Epoch 78/100, Loss: 0.00481277
+Model saved to cosine_model.h
+Epoch 79/100, Loss: 0.00477718
+Model saved to cosine_model.h
+Epoch 80/100, Loss: 0.00474383
+Model saved to cosine_model.h
+Epoch 81/100, Loss: 0.00471297
+Model saved to cosine_model.h
+Epoch 82/100, Loss: 0.00468341
+Model saved to cosine_model.h
+Epoch 83/100, Loss: 0.00465565
+Model saved to cosine_model.h
+Epoch 84/100, Loss: 0.00463016
+Model saved to cosine_model.h
+Epoch 85/100, Loss: 0.00460598
+Model saved to cosine_model.h
+Epoch 86/100, Loss: 0.00458309
+Model saved to cosine_model.h
+Epoch 87/100, Loss: 0.00456161
+Model saved to cosine_model.h
+Epoch 88/100, Loss: 0.00454131
+Model saved to cosine_model.h
+Epoch 89/100, Loss: 0.00452215
+Model saved to cosine_model.h
+Epoch 90/100, Loss: 0.00450401
+Model saved to cosine_model.h
+Epoch 91/100, Loss: 0.00448678
+Model saved to cosine_model.h
+Epoch 92/100, Loss: 0.00447116
+Model saved to cosine_model.h
+Epoch 93/100, Loss: 0.0044556
+Model saved to cosine_model.h
+Epoch 94/100, Loss: 0.00444157
+Model saved to cosine_model.h
+Epoch 95/100, Loss: 0.00442821
+Model saved to cosine_model.h
+Epoch 96/100, Loss: 0.00441552
+Model saved to cosine_model.h
+Epoch 97/100, Loss: 0.00440361
+Model saved to cosine_model.h
+Epoch 98/100, Loss: 0.00439172
+Model saved to cosine_model.h
+Epoch 99/100, Loss: 0.00438099
+Model saved to cosine_model.h
+Epoch 100/100, Loss: 0.00437081
+Model saved to cosine_model.h
+Model weights and optimizer state loaded from cosine_model.h
+
+============================================
+Model Structure:
+(Layer Type: Dense, Lyaer Name: DenseLayer1, Input size: 1, Output size:20)
+(Layer Type: ReLU)
+(Layer Type: Dense, Lyaer Name: DenseLayer2, Input size: 20, Output size:20)
+(Layer Type: ReLU)
+(Layer Type: Dense, Lyaer Name: DenseLayer2, Input size: 20, Output size:1)
+
+(Optimizer Type: SGD)
+
+============================================
+Test input: 0   Model output: 1.07674   True data: 1
+Test input: 0.596903    Model output: 0.806317  True data: 0.827081
+Test input: 1.19381     Model output: 0.372386  True data: 0.368125
+Test input: 1.79071     Model output: -0.213877         True data: -0.218143
+Test input: 2.38761     Model output: -0.71867  True data: -0.728969
+Test input: 2.98451     Model output: -0.983168         True data: -0.987688
+Test input: 3.58142     Model output: -0.780849         True data: -0.904827
+Test input: 4.17832     Model output: -0.382293         True data: -0.509041
+Test input: 4.77522     Model output: 0.0161799         True data: 0.0627905
+Test input: 5.37212     Model output: 0.414199  True data: 0.612907
+Test input: 5.96903     Model output: 0.812218  True data: 0.951057
+
+Loss: 0.0043707
+pass!!
