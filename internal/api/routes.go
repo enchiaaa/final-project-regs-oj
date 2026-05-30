@@ -13,22 +13,22 @@ func RegisterRoutes(router *gin.Engine, db *gorm.DB, jobQueue chan string) {
 	router.POST("/api/users/login", UserLoginHandler)
 	router.POST("/api/users/logout", UserLogoutHandler)
 	router.GET("/api/users/me", GetUserProfileHandler)
-	router.GET("/api/users/{userId}/submissions", GetUserSubmissionsHandler)
+	router.GET("/api/users/:userId/submissions", GetUserSubmissionsHandler)
 
 	// 題目相關
-	router.GET("/api/problems", GetAllProblemsHandler)
-	router.GET("/api/problems/{problemId}", GetProblemDetailHandler)
+	router.GET("/api/problems", GetAllProblemsHandler(db))
+	router.GET("/api/problems/:problemId", GetProblemDetailHandler(db))
 	router.PUT("/api/problems", UpdateProblemHandler)
-	router.DELETE("/api/problems/{problemId}", DeleteProblemHandler)
-	router.GET("/api/problems/{problemId}/testcases", GetProblemTestCasesHandler)
+	router.DELETE("/api/problems/:problemId", DeleteProblemHandler)
+	router.GET("/api/problems/:problemId/testcases", GetProblemTestCasesHandler)
 
 	// 提交相關
 	router.POST("/api/submissions", CreateSubmissionHandler(db, jobQueue))
-	router.GET("/api/submissions", GetSubmissionsHandler)
-	router.GET("/api/submissions/{operatorId}", GetSubmissionResultHandler)
-	router.GET("/api/submissions/{operatorId}/source", GetSubmissionSourceHandler)
+	router.GET("/api/submissions/:operatorId/source", GetSubmissionSourceHandler(db))
+	router.GET("/api/submissions/:operatorId", GetSubmissionResultHandler(db))
+	router.GET("/api/submissions", GetSubmissionsHandler(db))
 
 	// 統計相關
-	router.GET("/api/stats/problems/{problemId}", GetProblemStatsHandler)
-	router.GET("/api/stats/users/{userId}", GetUserStatsHandler)
+	router.GET("/api/stats/problems/:problemId", GetProblemStatsHandler)
+	router.GET("/api/stats/users/:userId", GetUserStatsHandler)
 }

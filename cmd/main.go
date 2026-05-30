@@ -12,7 +12,6 @@ import (
 func main() {
 	// 初始化資料庫連線
 	db := models.InitDB()
-	_ = db
 
 	// 啟動 Judge Goroutine（從任務隊列拿任務來評測）
 	jobQueue := make(chan string, 100)

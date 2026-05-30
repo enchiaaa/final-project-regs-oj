@@ -8,9 +8,13 @@ import (
 )
 
 func StartWorker(db *gorm.DB, jobQueue chan string) {
-	for id := range jobQueue {
-		// 從 jobQueue 拿到 submissionId，然後開始評測
+	for {
+		// 從 jobQueue 拿 submissionId 來評測
+		id, ok := <-jobQueue
+		if !ok {
+			return
+		}
 		fmt.Printf("Start judging submission %s\n", id)
-		runJudgingProcess(id)		
+		go runJudgingProcess(jobQueue, db, id)
 	}
 }
