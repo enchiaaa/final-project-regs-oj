@@ -15,6 +15,6 @@ func StartWorker(db *gorm.DB, jobQueue chan string) {
 			return
 		}
 		fmt.Printf("Start judging submission %s\n", id)
-		go runJudgingProcess(jobQueue, db, id)
+		go runJudgingProcess(db, id)
 	}
 }

@@ -107,6 +107,7 @@ func GetSubmissionResultHandler(db *gorm.DB) gin.HandlerFunc {
 			"OperatorId":  submission.OperatorID,
 			"ProblemId":   submission.ProblemID,
 			"Status":      submission.Status,
+			"Message":     submission.Message,
 			"SubmittedAt": submission.SubmittedAt,
 			"FinishedAt":  submission.FinishedAt,
 		})

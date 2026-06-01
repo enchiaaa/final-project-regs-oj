@@ -54,7 +54,8 @@ type Submission struct {
 	ProblemID  string `json:"problemId"`
 
 	// 狀態判定：Pending, Configuring, Compiling, Judging, AC, WA, CE, RE, TLE, SE
-	Status string `gorm:"default:'Pending'" json:"status"`
+	Status  string `gorm:"default:'Pending'" json:"status"`
+	Message string `json:"message"`
 
 	// 儲存路徑
 	SourcePath       string `json:"-"` // 使用者上傳的原始 zip 位置
