@@ -26,12 +26,12 @@ func GetAllProblemsHandler(db *gorm.DB) gin.HandlerFunc {
 	}
 }
 
-// /api/problems/:problemId
+// /api/problems/:problemCode
 func GetProblemDetailHandler(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		id := c.Param("problemId")
+		id := c.Param("problemCode")
 		var problem models.Problem
-		if err := db.First(&problem, "id = ?", id).Error; err != nil {
+		if err := db.First(&problem, "problem_code = ?", id).Error; err != nil {
 			c.JSON(http.StatusNotFound, gin.H{
 				"error": "題目不存在",
 			})

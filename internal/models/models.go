@@ -3,7 +3,6 @@ package models
 
 import (
 	"fmt"
-	"time"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -29,29 +28,24 @@ func InitDB() *gorm.DB {
 
 type User struct {
 	gorm.Model
-	ID        uint      `gorm:"primaryKey" json:"id"`
 	Username  string    `gorm:"unique;not null" json:"username"`
 	Password  string    `gorm:"not null" json:"-"`
-	Role      string    `gorm:"default:'Guest'" json:"role"` // Guest, User, Admin
-	CreatedAt time.Time `json:"createdAt"`
+	Role      string    `gorm:"default:'User'" json:"role"`
 }
 
 type Problem struct {
 	gorm.Model
-	ID           string    `gorm:"primaryKey" json:"id"`
-	Title        string    `json:"title"`
-	Description  string    `json:"description"`
-	LimitTime    int       `json:"limit_time"` // TLE 秒數
-	TestCasePath string    `json:"-"`          // 儲存伺服器上的測資路徑
-	CreatedAt    time.Time `json:"createdAt"`
+	ProblemCode  string		`gorm:"unique;not null" json:"problemCode"`
+	LimitTime    int		`json:"limit_time"` // TLE 秒數
+	ProblemPath  string		`json:"-"`
 }
 
 type Submission struct {
 	gorm.Model
-	ID         string `gorm:"primaryKey" json:"id"`
-	OperatorID string `json:"operatorId"`
-	UserID     uint   `json:"userId"`
-	ProblemID  string `json:"problemId"`
+	OperatorID	string	`gorm:"unique;not null" json:"operatorId"`
+
+	UserName	string	`json:"username"`
+	ProblemCode	string	`json:"problemCode"`
 
 	// 狀態判定：Pending, Configuring, Compiling, Judging, AC, WA, CE, RE, TLE, SE
 	Status  string `gorm:"default:'Pending'" json:"status"`
@@ -59,14 +53,8 @@ type Submission struct {
 
 	// 儲存路徑
 	SourcePath       string `json:"-"` // 使用者上傳的原始 zip 位置
+	WorkspacePath    string `json:"-"` // 解壓縮後的工作目錄
 	ConfigureLogPath string `json:"-"` // 評測配置過程的 log 路徑
 	CompileLogPath   string `json:"-"` // 編譯過程的 log 路徑
 	OutputLogPath    string `json:"-"` // 執行結果的 log 路徑
-
-	// 評測數據
-	ExitCode    int     `json:"exitCode"`
-	ExecuteTime float64 `json:"executeTime"` // 單位：秒，用於 TLE 判定
-
-	SubmittedAt time.Time  `json:"submittedAt"`
-	FinishedAt  *time.Time `json:"finishedAt"` // 評測完成時間
 }

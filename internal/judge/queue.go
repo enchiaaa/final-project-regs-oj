@@ -9,7 +9,7 @@ import (
 
 func StartWorker(db *gorm.DB, jobQueue chan string) {
 	for {
-		// 從 jobQueue 拿 submissionId 來評測
+		// 從 jobQueue 拿 operatorId 來評測
 		id, ok := <-jobQueue
 		if !ok {
 			return

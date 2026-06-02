@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"encoding/xml"
 
 	"gorm.io/gorm"
 
@@ -25,7 +26,17 @@ func runJudgingProcess(db *gorm.DB, submissionId string) {
 		return
 	}
 
-	// 2. 解壓縮上傳的 zip 檔案到 "tmp/oj/{submissionId}/workspace" 目錄下
+	submission.SourcePath = filepath.Join("uploads", submission.UserName, submission.ProblemCode, submission.OperatorID) + ".zip"
+	submission.WorkspacePath = filepath.Join("tmp", "upload", submission.UserName, submission.ProblemCode, submission.OperatorID, "workspace")
+	logPath := filepath.Join("tmp", "upload", submission.UserName, submission.ProblemCode, submission.OperatorID, "logs")	
+	problemPath := ""
+	err = db.Model(&models.Problem{}).Where("problem_code = ?", submission.ProblemCode).Select("problem_path").Take(&problemPath).Error
+	if err != nil {
+		appendInternalJudgeErrorLog(submissionId, "Failed to find problem path in database: "+err.Error())
+		return
+	}
+
+	// 2. 解壓縮上傳的 zip 檔案到 submission.WorkspacePath 目錄下
 	if err := prepareWorkspace(submission); err != nil {
 		finishSubmission(db, submission, "SE", "Failed to prepare workspace: "+err.Error())
 		appendInternalJudgeErrorLog(submissionId, "Failed to prepare workspace: "+err.Error())
@@ -33,7 +44,7 @@ func runJudgingProcess(db *gorm.DB, submissionId string) {
 	}
 
 	// 3. 建立評測過程中的 log 檔案（configure.log、compile.log、output.log），並將路徑寫入 submission 中
-	if err := prepareLogFiles(submission); err != nil {
+	if err := prepareLogFiles(submission, logPath); err != nil {
 		finishSubmission(db, submission, "SE", "Failed to prepare log files: "+err.Error())
 		appendInternalJudgeErrorLog(submissionId, "Failed to prepare log files: "+err.Error())
 		return
@@ -45,7 +56,7 @@ func runJudgingProcess(db *gorm.DB, submissionId string) {
 	}
 
 	// 4. 確認解壓縮後的 workspace 目錄下是否有 CMakeLists.txt 檔案
-	if err := checkCMakeListsExists(filepath.Join("tmp", "oj", submission.OperatorID, "workspace")); err != nil {
+	if err := checkCMakeListsExists(submission.WorkspacePath); err != nil {
 		finishSubmission(db, submission, "SE", err.Error())
 		return
 	}
@@ -57,8 +68,8 @@ func runJudgingProcess(db *gorm.DB, submissionId string) {
 		finishSubmission(db, submission, "SE", "Failed to update submission status to Configuring: "+err.Error())
 		return
 	}
-	mustWriteLog(submission.ID, submission.ConfigureLogPath, "Start configuring\n")
-	if err := runDockerConfigure(filepath.Join("tmp", "oj", submission.OperatorID, "workspace"), submission.ConfigureLogPath); err != nil {
+	mustWriteLog(submissionId, submission.ConfigureLogPath, "Start configuring\n")
+	if err := runDockerConfigure(submission, problemPath); err != nil {
 		finishSubmission(db, submission, "SE", "Configuration failed: "+err.Error())
 		return
 	}
@@ -70,54 +81,71 @@ func runJudgingProcess(db *gorm.DB, submissionId string) {
 		finishSubmission(db, submission, "SE", "Failed to update submission status to Compiling: "+err.Error())
 		return
 	}
-	mustWriteLog(submission.ID, submission.CompileLogPath, "Start compiling\n")
-	if err := runDockerCompile(filepath.Join("tmp", "oj", submission.OperatorID, "workspace"), submission.CompileLogPath); err != nil {
+	mustWriteLog(submissionId, submission.CompileLogPath, "Start compiling\n")
+	if err := runDockerCompile(submission, problemPath); err != nil {
 		finishSubmission(db, submission, "CE", "Compilation failed: "+err.Error())
 		return
 	}
 
-	// 7. judging 階段（模擬評測結果為 AC）
+	// 7. judging 階段
 	submission.Status = "Judging"
-	mustWriteLog(submission.ID, submission.OutputLogPath, "Start judging...\n")
 	if err := db.Save(submission).Error; err != nil {
 		appendInternalJudgeErrorLog(submissionId, "Judging failed: "+err.Error())
 		finishSubmission(db, submission, "SE", "Judging failed: "+err.Error())
 		return
 	}
+	mustWriteLog(submissionId, submission.OutputLogPath, "Start running\n")
 
-	// 模擬評測結果為 AC
-	now := time.Now()
-	submission.Status = "AC"
-	submission.FinishedAt = &now
-	mustWriteLog(submission.ID, submission.OutputLogPath, "Judging completed: AC\n")
-	if err := db.Save(submission).Error; err != nil {
-		appendInternalJudgeErrorLog(submissionId, "Failed to update submission status to AC: "+err.Error()+"\n")
-		finishSubmission(db, submission, "SE", "Failed to update submission status to AC: "+err.Error())
+	runErr := runDockerRun(submission, problemPath)
+
+	resultPath := filepath.Join(submission.WorkspacePath, "build", "result.xml")
+
+	// 若 result.xml 存在
+	if _, resultErr := os.Stat(resultPath); resultErr == nil {
+		ok, err := checkTestResults(resultPath)
+		if err != nil {
+			finishSubmission(db, submission, "RE", "Failed to check test results: "+err.Error())
+			return
+		}
+
+		if !ok {
+			finishSubmission(db, submission, "WA", "Some test cases failed")
+			return
+		}
+
+		finishSubmission(db, submission, "AC", "Accepted")
 		return
 	}
+
+	if runErr != nil {
+		finishSubmission(db, submission, "RE", "Runtime error: "+runErr.Error())
+		return
+	}
+
+	finishSubmission(db, submission, "RE", "result.xml not found")
 }
+
 
 // 從資料庫中讀取 submission，如果找不到就回傳錯誤
 func loadSubmission(db *gorm.DB, submissionId string) (*models.Submission, error) {
 	submission := models.Submission{}
-	if err := db.Where("id = ?", submissionId).First(&submission).Error; err != nil {
+	if err := db.Where("operator_id = ?", submissionId).First(&submission).Error; err != nil {
 		return nil, err
 	}
 	return &submission, nil
 }
 
-// 解壓縮上傳的 zip 檔案到 "tmp/oj/{submissionId}/workspace" 目錄下
+// 解壓縮上傳的 zip 檔案到 submission.WorkspacePath 目錄下
 func prepareWorkspace(submission *models.Submission) error {
-	if err := unzipFile(submission.SourcePath, filepath.Join("tmp", "oj", submission.OperatorID, "workspace")); err != nil {
+	if err := unzipFile(submission.SourcePath, submission.WorkspacePath); err != nil {
 		return fmt.Errorf("failed to unzip file: %v", err)
 	}
 	return nil
 }
 
 // 建立評測過程中的 log 檔案（configure.log、compile.log、output.log）
-func prepareLogFiles(submission *models.Submission) error {
-	logDir := filepath.Join("tmp", "oj", submission.ID, "logs")
-
+func prepareLogFiles(submission *models.Submission, logPath string) error {
+	logDir := logPath
 	if err := os.MkdirAll(logDir, 0755); err != nil {
 		return err
 	}
@@ -149,59 +177,72 @@ func checkCMakeListsExists(workspace string) error {
 
 // 結束 submission 並更新狀態和訊息
 func finishSubmission(db *gorm.DB, submission *models.Submission, status string, message string) {
-	now := time.Now()
 	submission.Status = status
 	submission.Message = message
-	submission.FinishedAt = &now
 	if err := db.Save(submission).Error; err != nil {
-		appendInternalJudgeErrorLog(submission.ID, "Failed to update submission as "+status+": "+err.Error())
+		appendInternalJudgeErrorLog(submission.OperatorID, "Failed to update submission as "+status+": "+err.Error())
 	}
 }
 
 // 使用 Docker 執行 configure 指令，並將輸出寫入 configure.log 檔案中
-func runDockerConfigure(workspace string, configureLog string) error {
-	absWorkspace, err := filepath.Abs(workspace)
+func runDockerConfigure(submission *models.Submission, problemPath string) error {
+	absWorkspace, err := filepath.Abs(submission.WorkspacePath)
+	if err != nil {
+		return err
+	}
+	abProblemPath, err := filepath.Abs(problemPath)
 	if err != nil {
 		return err
 	}
 
-	// -v 把資料夾掛載到容器內的 /workspace
+	// -v 把資料夾掛載到容器內的 /workspace 和 /problem，讓容器內的程式可以讀取使用者上傳的程式碼和題目資料
 	// -w 進入容器後，工作目錄直接設為 /workspace
 	cmd := exec.Command(
-		"docker", "run", "--rm",
+		"docker", "run", "--name", "judge-configure-" + submission.OperatorID,
 		"-v", absWorkspace+":/workspace",
+		"-v", abProblemPath+":/problem",
 		"-w", "/workspace",
 		"yhlib/cs3060701",
-		"cmake", "-G", "Ninja", "-B", "build",
+		"cmake",
+		"-S", "/problem/solution",
+		"-G", "Ninja",
+		"-B", "build",
+		"-D", "SOURCE_DIR=/workspace",
+		"-D", "PROBLEM_ROOT=/problem",
 	)
 
 	// 將 configure 的輸出寫入 configure.log 檔案中
 	output, err := cmd.CombinedOutput()
-	if writeErr := writeToLogFile(configureLog, string(output)); writeErr != nil {
+	if writeErr := writeToLogFile(submission.ConfigureLogPath, string(output)); writeErr != nil {
 		return fmt.Errorf("failed to write configure log: %w", writeErr)
 	}
 	if err != nil {
 		return fmt.Errorf("docker configure failed: %w", err)
 	}
 
-	if err := writeToLogFile(configureLog, "Configuration completed successfully\n"); err != nil {
+	if err := writeToLogFile(submission.ConfigureLogPath, "Configuration completed successfully\n"); err != nil {
 		return fmt.Errorf("failed to write configure log: %w", err)
 	}
 	return nil
 }
 
 // 使用 Docker 執行 compile 指令，並將輸出寫入 compile.log 檔案中
-func runDockerCompile(workspace string, compileLog string) error {
-	absWorkspace, err := filepath.Abs(workspace)
+func runDockerCompile(submission *models.Submission, problemPath string) error {
+	absWorkspace, err := filepath.Abs(submission.WorkspacePath)
+	if err != nil {
+		return err
+	}
+	abProblemPath, err := filepath.Abs(problemPath)
 	if err != nil {
 		return err
 	}
 
-	// -v 把資料夾掛載到容器內的 /workspace
+	// -v 把資料夾掛載到容器內的 /workspace 和 /problem
 	// -w 進入容器後，工作目錄直接設為 /workspace
 	cmd := exec.Command(
 		"docker", "run", "--rm",
 		"-v", absWorkspace+":/workspace",
+		"-v", abProblemPath+":/problem",
 		"-w", "/workspace",
 		"yhlib/cs3060701",
 		"cmake", "--build", "build",
@@ -209,17 +250,77 @@ func runDockerCompile(workspace string, compileLog string) error {
 
 	// 將 compile 的輸出寫入 compile.log 檔案中
 	output, err := cmd.CombinedOutput()
-	if writeErr := writeToLogFile(compileLog, string(output)); writeErr != nil {
+	if writeErr := writeToLogFile(submission.CompileLogPath, string(output)); writeErr != nil {
 		return fmt.Errorf("failed to write compile log: %w", writeErr)
 	}
 	if err != nil {
 		return fmt.Errorf("docker compile failed: %w", err)
 	}
 
-	if err := writeToLogFile(compileLog, "Compilation completed successfully\n"); err != nil {
+	if err := writeToLogFile(submission.CompileLogPath, "Compilation completed successfully\n"); err != nil {
 		return fmt.Errorf("failed to write compile log: %w", err)
 	}
 	return nil
+}
+
+// 使用 Docker 執行 run 指令，並將輸出寫入 output.log 檔案中
+func runDockerRun(submission *models.Submission, problemPath string) error {
+	abwsWorkspace, err := filepath.Abs(submission.WorkspacePath)
+	if err != nil {
+		return err
+	}
+	abProblemPath, err := filepath.Abs(problemPath)
+	if err != nil {
+		return err
+	}
+	
+	// -v 把資料夾掛載到容器內的 /workspace 和 /problem
+	// -w 進入容器後，工作目錄直接設為 /workspace
+	cmd := exec.Command(
+		"docker", "run", "--rm",
+		"--network", "none",
+		"-v", abwsWorkspace+":/workspace",
+		"-v", abProblemPath+":/problem",
+		"-w", "/workspace",
+		"yhlib/cs3060701",
+		"ctest", "-Q", "--test-dir", "build", "--output-junit", "result.xml",
+	)
+
+	// 將 run 的輸出寫入 output.log 檔案中
+	output, err := cmd.CombinedOutput()
+	if writeErr := writeToLogFile(submission.OutputLogPath, string(output)); writeErr != nil {
+		return fmt.Errorf("failed to write output log: %w", writeErr)
+	}
+
+	resultPath := filepath.Join(submission.WorkspacePath, "build", "result.xml")
+	if _, resultErr := os.Stat(resultPath); resultErr == nil {
+		return nil
+	}
+
+	if err != nil {
+		return fmt.Errorf("docker run failed without result.xml: %w", err)
+	}
+
+	return fmt.Errorf("result.xml not found")
+}
+
+// 查看 result.xml 的內容，確認是否有測資沒有通過
+func checkTestResults(resultPath string) (bool, error) {
+	type TestCaseResult struct {
+		Failures int `xml:"failures,attr"`
+	}
+
+	resultFile, err := os.ReadFile(resultPath)
+	if err != nil {
+		return false, fmt.Errorf("failed to read result file: %w", err)
+	}
+	
+	var testResult TestCaseResult
+	if err := xml.Unmarshal(resultFile, &testResult); err != nil {
+		return false, fmt.Errorf("failed to parse result file: %w", err)
+	}
+
+	return testResult.Failures == 0, nil
 }
 
 // 將評測過程中的錯誤訊息記錄到系統中，供管理員查看
