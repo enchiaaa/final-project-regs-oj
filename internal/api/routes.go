@@ -25,6 +25,7 @@ func RegisterRoutes(router *gin.Engine, db *gorm.DB, jobQueue chan string) {
 	// 提交相關
 	router.POST("/api/submissions", CreateSubmissionHandler(db, jobQueue))
 	router.GET("/api/submissions/:operatorId/source", GetSubmissionSourceHandler(db))
+	router.GET("/api/submissions/:operatorId/logs/:logType", GetSubmissionLogHandler(db))
 	router.GET("/api/submissions/:operatorId", GetSubmissionResultHandler(db))
 	router.GET("/api/submissions", GetSubmissionsHandler(db))
 

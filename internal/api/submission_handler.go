@@ -120,3 +120,39 @@ func GetSubmissionSourceHandler(db *gorm.DB) gin.HandlerFunc {
 		c.File(submission.SourcePath)
 	}
 }
+
+// /api/submissions/:operatorId/logs/:logType GET 回傳指定 log 內容
+func GetSubmissionLogHandler(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		operatorId := c.Param("operatorId")
+		logType := c.Param("logType")
+
+		submission := models.Submission{}
+		if err := db.Where("operator_id = ?", operatorId).First(&submission).Error; err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Submission not found"})
+			return
+		}
+
+		logPath := ""
+
+		switch logType {
+		case "configure":
+			logPath = submission.ConfigureLogPath
+		case "compile":
+			logPath = submission.CompileLogPath
+		case "output":
+			logPath = submission.OutputLogPath
+		default:
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid log type"})
+			return
+		}
+
+		content, err := os.ReadFile(logPath)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "log file not found"})
+			return
+		}
+
+		c.String(http.StatusOK, string(content))
+	}
+}
