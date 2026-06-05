@@ -29,7 +29,7 @@ func InitDB() *gorm.DB {
 type User struct {
 	gorm.Model
 	Username  string    `gorm:"unique;not null" json:"username"`
-	Password  string    `gorm:"not null" json:"-"`
+	PasswordHash	string	`gorm:"not null" json:"-"`
 	Role      string    `gorm:"default:'User'" json:"role"`
 }
 

@@ -9,11 +9,11 @@ import (
 
 func RegisterRoutes(router *gin.Engine, db *gorm.DB, jobQueue chan string) {
 	// 使用者相關
-	router.POST("/api/users/register", UserRegisterHandler)
-	router.POST("/api/users/login", UserLoginHandler)
-	router.POST("/api/users/logout", UserLogoutHandler)
-	router.GET("/api/users/me", GetUserProfileHandler)
-	router.GET("/api/users/:userId/submissions", GetUserSubmissionsHandler)
+	router.POST("/api/users/register", UserRegisterHandler(db))
+	router.POST("/api/users/login", UserLoginHandler(db))
+	router.POST("/api/users/logout", UserLogoutHandler(db))
+	router.GET("/api/users/me", GetUserProfileHandler(db))
+	router.GET("/api/users/:userId/submissions", GetUserSubmissionsHandler(db))
 
 	// 題目相關
 	router.GET("/api/problems", GetAllProblemsHandler(db))
