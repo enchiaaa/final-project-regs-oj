@@ -4,14 +4,14 @@ package main
 import (
 	"online-judge/internal/api"
 	"online-judge/internal/judge"
-	"online-judge/internal/models"
+	"online-judge/internal/database"
 
 	"github.com/gin-gonic/gin"
 )
 
 func main() {
 	// 初始化資料庫連線
-	db := models.InitDB()
+	db := database.InitDB()
 
 	// 啟動 Judge Goroutine（從任務隊列拿任務來評測）
 	jobQueue := make(chan string, 100)

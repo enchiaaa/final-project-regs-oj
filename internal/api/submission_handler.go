@@ -33,18 +33,20 @@ func CreateSubmissionHandler(db *gorm.DB, jobQueue chan string) gin.HandlerFunc 
 		operatorId := uuid.New().String()
 
 		// TODO: 從 Authorization header 取得 JWT，解析出 userId
-		userName := "B11132003"
+		user := models.User{}
+		db.Where("username = ?", "B11132003").First(&user)
 		problemCode := c.PostForm("problemCode")
+		problem := models.Problem{}
 
 		// 檢查 problemCode 是否存在
-		if db.Where("problem_code = ?", problemCode).First(&models.Problem{}).Error != nil {
+		if err := db.Where("problem_code = ?", problemCode).First(&problem).Error; err != nil{
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Problem not found"})
 			return
 		}
-
+		
 		// 將上傳的檔案儲存到指定路徑 "uploads/{userName}/{problemCode}/{operatorId}.ext"
 		ext := filepath.Ext(strings.ToLower(file.Filename))
-		dst := filepath.Join("uploads", userName, problemCode, operatorId+ext)
+		dst := filepath.Join("uploads", user.Username, problemCode, operatorId+ext)
 
 		// 0755 是 Linux 的檔案權限，表示擁有者有讀寫執行權限，群組和其他人只有讀取和執行權限
 		cmd := os.MkdirAll(filepath.Dir(dst), 0755)
@@ -59,11 +61,11 @@ func CreateSubmissionHandler(db *gorm.DB, jobQueue chan string) gin.HandlerFunc 
 
 		// 寫入資料庫
 		newSubmission := models.Submission{
-			OperatorID:  operatorId,
-			UserName:    userName,
-			ProblemCode: problemCode,
-			Status:      "Pending",
-			SourcePath:  dst,
+			OperatorID:	operatorId,
+			UserID:		user.ID,
+			ProblemID:	problem.ID,
+			Status:		"Pending",
+			SourcePath:	dst,
 		}
 		if err := db.Create(&newSubmission).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create submission record"})
@@ -95,13 +97,14 @@ func GetSubmissionResultHandler(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		operatorId := c.Param("operatorId")
 		submission := models.Submission{}
-		if err := db.Where("operator_id = ?", operatorId).First(&submission).Error; err != nil {
+		if err := db.Preload("Problem").Where("operator_id = ?", operatorId).First(&submission).Error; err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Submission not found"})
 			return
 		}
+
 		c.JSON(http.StatusOK, gin.H{
 			"OperatorId":  submission.OperatorID,
-			"ProblemCode": submission.ProblemCode,
+			"ProblemCode": submission.Problem.ProblemCode,
 			"Status":      submission.Status,
 			"Message":     submission.Message,
 		})

@@ -13,18 +13,18 @@ import (
 )
 
 type UserRegisterRequest struct {
-	Username  string	`json:"username" binding:"required"`
-	Password  string	`json:"password" binding:"required, min=8"`
+	Username string `json:"username" form:"username" binding:"required"`
+	Password string `json:"password" form:"password" binding:"required,min=8"`
 }
 type UserLoginRequest struct {
-	Username  string	`json:"username" binding:"required"`
-	Password  string	`json:"password" binding:"required"`
+	Username string `json:"username" form:"username" binding:"required"`
+	Password string `json:"password" form:"password" binding:"required"`
 }
 
-func UserRegisterHandler(db *gorm.DB) gin.HandlerFunc{
+func UserRegisterHandler(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req UserRegisterRequest
-		if err := c.ShouldBindJSON(&req); err != nil {
+		if err := c.ShouldBind(&req); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -44,15 +44,20 @@ func UserRegisterHandler(db *gorm.DB) gin.HandlerFunc{
 		}
 
 		passwordHash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
-		if err != nil{
+		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to hash password"})
 			return
 		}
-		
+
+		userRole := models.Role{}
+		if err := db.Where("name = ?", "User").First(&userRole).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load default user role"})
+			return
+		}
 		newUser := models.User{
-			Username: req.Username,
+			Username:     req.Username,
 			PasswordHash: string(passwordHash),
-			Role: "user",
+			RoleID:       userRole.ID,
 		}
 
 		if err := db.Create(&newUser).Error; err != nil {
@@ -67,10 +72,10 @@ func UserRegisterHandler(db *gorm.DB) gin.HandlerFunc{
 	}
 }
 
-func UserLoginHandler(db *gorm.DB) gin.HandlerFunc{
+func UserLoginHandler(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req UserLoginRequest
-		if err := c.ShouldBindJSON(&req); err != nil {
+		if err := c.ShouldBind(&req); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -84,33 +89,33 @@ func UserLoginHandler(db *gorm.DB) gin.HandlerFunc{
 			})
 			return
 		}
-		if err != nil  {
+		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check username"})
 			return
 		}
 
 		// 確認密碼是否正確
-		if err := bcrypt.CompareHashAndPassword([]byte(existingUser.PasswordHash), []byte(req.Password)); err != nil{
+		if err := bcrypt.CompareHashAndPassword([]byte(existingUser.PasswordHash), []byte(req.Password)); err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "帳號或密碼錯誤"})
 			return
 		}
 
 		c.JSON(http.StatusOK, gin.H{
 			"message": "User login successfully!",
-			"user":	existingUser.Username,
-			"token" : "jwt",
+			"user":    existingUser.Username,
+			"token":   "jwt",
 		})
 	}
 }
 
-func UserLogoutHandler(db *gorm.DB) gin.HandlerFunc{
+func UserLogoutHandler(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {}
 }
 
-func GetUserProfileHandler(db *gorm.DB) gin.HandlerFunc{
+func GetUserProfileHandler(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {}
 }
 
-func GetUserSubmissionsHandler(db *gorm.DB) gin.HandlerFunc{
+func GetUserSubmissionsHandler(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {}
 }

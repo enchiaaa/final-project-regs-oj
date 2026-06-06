@@ -29,15 +29,11 @@ func runJudgingProcess(db *gorm.DB, submissionId string) {
 		appendInternalJudgeErrorLog(submissionId, "Failed to find submission in database: "+err.Error())
 		return
 	}
-	problem, err := loadProblem(db, submission.ProblemCode)
-	if err != nil {
-		appendInternalJudgeErrorLog(submissionId, "Failed to find problem in database: "+err.Error())
-		return
-	}
 
-	submission.SourcePath = filepath.Join("uploads", submission.UserName, submission.ProblemCode, submission.OperatorID) + ".zip"
-	submission.WorkspacePath = filepath.Join("tmp", "upload", submission.UserName, submission.ProblemCode, submission.OperatorID, "workspace")
-	logPath := filepath.Join("tmp", "upload", submission.UserName, submission.ProblemCode, submission.OperatorID, "logs")
+	path := submission.User.Username + "/" + submission.Problem.ProblemCode + "/" + submission.OperatorID
+	submission.SourcePath = filepath.Join("uploads", path) + ".zip"
+	submission.WorkspacePath = filepath.Join("tmp", "upload", path, "workspace")
+	logPath := filepath.Join("tmp", "upload", path, "logs")
 
 	// 2. 解壓縮上傳的 zip 檔案到 submission.WorkspacePath 目錄下
 	if err := prepareWorkspace(submission); err != nil {
@@ -72,7 +68,7 @@ func runJudgingProcess(db *gorm.DB, submissionId string) {
 		return
 	}
 	mustWriteLog(submissionId, submission.ConfigureLogPath, "Start configuring\n")
-	if err := runDockerConfigure(submission, problem); err != nil {
+	if err := runDockerConfigure(submission); err != nil {
 		finishSubmission(db, submission, "SE", "Configuration failed: "+err.Error())
 		return
 	}
@@ -85,7 +81,7 @@ func runJudgingProcess(db *gorm.DB, submissionId string) {
 		return
 	}
 	mustWriteLog(submissionId, submission.CompileLogPath, "Start compiling\n")
-	if err := runDockerCompile(submission, problem); err != nil {
+	if err := runDockerCompile(submission); err != nil {
 		finishSubmission(db, submission, "CE", "Compilation failed: "+err.Error())
 		return
 	}
@@ -99,7 +95,7 @@ func runJudgingProcess(db *gorm.DB, submissionId string) {
 	}
 	mustWriteLog(submissionId, submission.OutputLogPath, "Start running\n")
 
-	runErr := runDockerRun(submission, problem)
+	runErr := runDockerRun(submission)
 
 	resultPath := filepath.Join(submission.WorkspacePath, "build", "result.xml")
 
@@ -136,20 +132,20 @@ func runJudgingProcess(db *gorm.DB, submissionId string) {
 // 從資料庫中讀取 submission，如果找不到就回傳錯誤
 func loadSubmission(db *gorm.DB, submissionId string) (*models.Submission, error) {
 	submission := models.Submission{}
-	if err := db.Where("operator_id = ?", submissionId).First(&submission).Error; err != nil {
+	if err := db.Preload("User").Preload("Problem").Where("operator_id = ?", submissionId).First(&submission).Error; err != nil {
 		return nil, err
 	}
 	return &submission, nil
 }
 
 // 從資料庫中讀取 problem，如果找不到就回傳錯誤
-func loadProblem(db *gorm.DB, problemCode string) (*models.Problem, error) {
-	problem := models.Problem{}
-	if err := db.Where("problem_code = ?", problemCode).First(&problem).Error; err != nil {
-		return nil, err
-	}
-	return &problem, nil
-}
+// func loadProblem(db *gorm.DB, problemId uint) (*models.Problem, error) {
+// 	problem := models.Problem{}
+// 	if err := db.Where("problem_id = ?", problemCode).First(&problem).Error; err != nil {
+// 		return nil, err
+// 	}
+// 	return &problem, nil
+// }
 
 // 解壓縮上傳的 zip 檔案到 submission.WorkspacePath 目錄下
 func prepareWorkspace(submission *models.Submission) error {
@@ -201,12 +197,12 @@ func finishSubmission(db *gorm.DB, submission *models.Submission, status string,
 }
 
 // 使用 Docker 執行 configure 指令，並將輸出寫入 configure.log 檔案中
-func runDockerConfigure(submission *models.Submission, problem *models.Problem) error {
+func runDockerConfigure(submission *models.Submission) error {
 	absWorkspace, err := filepath.Abs(submission.WorkspacePath)
 	if err != nil {
 		return err
 	}
-	abProblemPath, err := filepath.Abs(problem.ProblemPath)
+	abProblemPath, err := filepath.Abs(submission.Problem.ProblemPath)
 	if err != nil {
 		return err
 	}
@@ -243,12 +239,12 @@ func runDockerConfigure(submission *models.Submission, problem *models.Problem) 
 }
 
 // 使用 Docker 執行 compile 指令，並將輸出寫入 compile.log 檔案中
-func runDockerCompile(submission *models.Submission, problem *models.Problem) error {
+func runDockerCompile(submission *models.Submission) error {
 	absWorkspace, err := filepath.Abs(submission.WorkspacePath)
 	if err != nil {
 		return err
 	}
-	abProblemPath, err := filepath.Abs(problem.ProblemPath)
+	abProblemPath, err := filepath.Abs(submission.Problem.ProblemPath)
 	if err != nil {
 		return err
 	}
@@ -280,12 +276,12 @@ func runDockerCompile(submission *models.Submission, problem *models.Problem) er
 }
 
 // 使用 Docker 執行 run 指令，並將輸出寫入 output.log 檔案中
-func runDockerRun(submission *models.Submission, problem *models.Problem) error {
+func runDockerRun(submission *models.Submission) error {
 	abwsWorkspace, err := filepath.Abs(submission.WorkspacePath)
 	if err != nil {
 		return err
 	}
-	abProblemPath, err := filepath.Abs(problem.ProblemPath)
+	abProblemPath, err := filepath.Abs(submission.Problem.ProblemPath)
 	if err != nil {
 		return err
 	}
@@ -301,7 +297,7 @@ func runDockerRun(submission *models.Submission, problem *models.Problem) error 
 		"-v", abProblemPath+":/problem",
 		"-w", "/workspace",
 		"yhlib/cs3060701",
-		"timeout", strconv.Itoa(problem.LimitTime)+"s",
+		"timeout", strconv.Itoa(submission.Problem.LimitTime)+"s",
 		"ctest", "-Q", "--test-dir", "build", "--output-junit", "result.xml",
 	)
 

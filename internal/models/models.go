@@ -1,36 +1,30 @@
-// 定義 User、Problem、Submission 三個主要的資料模型，使用 GORM 的 struct tags 來指定資料庫欄位的屬性和 JSON 序列化行為。
+// 定義資料表
 package models
 
 import (
-	"fmt"
-
-	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
-// 初始化資料庫連線，並根據模型自動建立資料表
-func InitDB() *gorm.DB {
-	db, err := gorm.Open(postgres.Open("host=localhost user=user password=123 dbname=OJ_db sslmode=disable"), &gorm.Config{})
-	if err != nil {
-		panic(fmt.Sprintf("failed to connect database: %v", err))
-	}
-
-	// 根據模型建立資料表
-	err = db.AutoMigrate(&User{}, &Problem{}, &Submission{})
-	if err != nil {
-		panic(fmt.Sprintf("failed to migrate database: %v", err))
-	}
-
-	fmt.Println("資料庫連線成功")
-
-	return db
-}
-
 type User struct {
 	gorm.Model
-	Username  string    `gorm:"unique;not null" json:"username"`
+	Username  		string	`gorm:"unique;not null" json:"username"`
 	PasswordHash	string	`gorm:"not null" json:"-"`
-	Role      string    `gorm:"default:'User'" json:"role"`
+
+	// 外鍵與關聯的物件
+	RoleID	uint	`gorm:"not null" json:"role_id"`
+	Role	Role	`json:"role,omitempty"`
+}
+
+type Role struct{
+	gorm.Model
+	Name	string	`gorm:"unique;not null" json:"name"`
+	Permissions []Permission	`gorm:"many2many:role_permissions;" json:"permissions,omitempty"`
+}
+
+type Permission struct{
+	gorm.Model
+	Name	string	`gorm:"unique;not null" json:"name"`
+	Roles []Role	`gorm:"many2many:role_permissions;" json:"roles,omitempty"`
 }
 
 type Problem struct {
@@ -44,10 +38,14 @@ type Submission struct {
 	gorm.Model
 	OperatorID	string	`gorm:"unique;not null" json:"operatorId"`
 
-	UserName	string	`json:"username"`
-	ProblemCode	string	`json:"problemCode"`
+	// 外鍵與關聯的物件
+	UserID	uint	`gorm:"not null" json:"user_id"`
+	User 	User	`json:"user,omitempty"`
 
-	// 狀態判定：Pending, Configuring, Compiling, Judging, AC, WA, CE, RE, TLE, SE
+	// 外鍵與關聯的物件
+	ProblemID	uint	`gorm:"not null" json:"problem_id"`
+	Problem		Problem	`json:"problem,omitempty"`
+
 	Status  string `gorm:"default:'Pending'" json:"status"`
 	Message string `json:"message"`
 
