@@ -336,7 +336,7 @@ func checkTestResults(resultPath string) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("failed to read result file: %w", err)
 	}
-	
+
 	var testResult TestCaseResult
 	if err := xml.Unmarshal(resultFile, &testResult); err != nil {
 		return false, fmt.Errorf("failed to parse result file: %w", err)

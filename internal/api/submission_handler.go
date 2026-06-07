@@ -32,18 +32,23 @@ func CreateSubmissionHandler(db *gorm.DB, jobQueue chan string) gin.HandlerFunc 
 		// 生成唯一的 operatorId
 		operatorId := uuid.New().String()
 
-		// TODO: 從 Authorization header 取得 JWT，解析出 userId
+		// 解析出 userID
 		user := models.User{}
-		db.Where("username = ?", "B11132003").First(&user)
+		userID := c.GetUint("userID")
+		if err := db.First(&user, userID).Error; err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "User not found"})
+			return
+		}
+
 		problemCode := c.PostForm("problemCode")
 		problem := models.Problem{}
 
 		// 檢查 problemCode 是否存在
-		if err := db.Where("problem_code = ?", problemCode).First(&problem).Error; err != nil{
+		if err := db.Where("problem_code = ?", problemCode).First(&problem).Error; err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Problem not found"})
 			return
 		}
-		
+
 		// 將上傳的檔案儲存到指定路徑 "uploads/{userName}/{problemCode}/{operatorId}.ext"
 		ext := filepath.Ext(strings.ToLower(file.Filename))
 		dst := filepath.Join("uploads", user.Username, problemCode, operatorId+ext)
@@ -61,11 +66,11 @@ func CreateSubmissionHandler(db *gorm.DB, jobQueue chan string) gin.HandlerFunc 
 
 		// 寫入資料庫
 		newSubmission := models.Submission{
-			OperatorID:	operatorId,
-			UserID:		user.ID,
-			ProblemID:	problem.ID,
-			Status:		"Pending",
-			SourcePath:	dst,
+			OperatorID: operatorId,
+			UserID:     user.ID,
+			ProblemID:  problem.ID,
+			Status:     "Pending",
+			SourcePath: dst,
 		}
 		if err := db.Create(&newSubmission).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create submission record"})
@@ -81,9 +86,11 @@ func CreateSubmissionHandler(db *gorm.DB, jobQueue chan string) gin.HandlerFunc 
 // /api/submissions GET 查詢個人提交紀錄
 func GetSubmissionsHandler(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		userName := "B11132003" // TODO: 從 JWT 解析出 userName
+		// 解析出 userID
+		userID := c.GetUint("userID")
 		submissions := []models.Submission{}
-		if err := db.Where("user_name = ?", userName).Find(&submissions).Error; err != nil {
+
+		if err := db.Where("user_id = ?", userID).Find(&submissions).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to query submissions"})
 			return
 		}
@@ -92,18 +99,25 @@ func GetSubmissionsHandler(db *gorm.DB) gin.HandlerFunc {
 	}
 }
 
-// /api/submissions/:operatorId GET 查詢提交結果
+// /api/submissions/:operatorId GET 查詢個人提交結果
 func GetSubmissionResultHandler(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		operatorId := c.Param("operatorId")
 		submission := models.Submission{}
-		if err := db.Preload("Problem").Where("operator_id = ?", operatorId).First(&submission).Error; err != nil {
+		if err := db.Preload("Problem").Preload("User").Where("operator_id = ?", operatorId).First(&submission).Error; err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Submission not found"})
+			return
+		}
+
+		// 解析出 userID 確認身分：只能查詢自己的提交結果
+		if submission.UserID != c.GetUint("userID") {
+			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 			return
 		}
 
 		c.JSON(http.StatusOK, gin.H{
 			"OperatorId":  submission.OperatorID,
+			"Username":    submission.User.Username,
 			"ProblemCode": submission.Problem.ProblemCode,
 			"Status":      submission.Status,
 			"Message":     submission.Message,
@@ -120,6 +134,13 @@ func GetSubmissionSourceHandler(db *gorm.DB) gin.HandlerFunc {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Submission not found"})
 			return
 		}
+
+		// 解析出 userID 確認身分：只能取得自己提交的程式碼
+		if submission.UserID != c.GetUint("userID") {
+			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+			return
+		}
+
 		c.File(submission.SourcePath)
 	}
 }
@@ -133,6 +154,12 @@ func GetSubmissionLogHandler(db *gorm.DB) gin.HandlerFunc {
 		submission := models.Submission{}
 		if err := db.Where("operator_id = ?", operatorId).First(&submission).Error; err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Submission not found"})
+			return
+		}
+
+		// 解析出 userID 確認身分：只能查詢自己的提交結果的 log
+		if submission.UserID != c.GetUint("userID") {
+			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 			return
 		}
 

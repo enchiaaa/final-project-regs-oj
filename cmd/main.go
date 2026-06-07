@@ -3,8 +3,8 @@ package main
 
 import (
 	"online-judge/internal/api"
-	"online-judge/internal/judge"
 	"online-judge/internal/database"
+	"online-judge/internal/judge"
 
 	"github.com/gin-gonic/gin"
 )

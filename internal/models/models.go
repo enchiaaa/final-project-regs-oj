@@ -7,44 +7,44 @@ import (
 
 type User struct {
 	gorm.Model
-	Username  		string	`gorm:"unique;not null" json:"username"`
-	PasswordHash	string	`gorm:"not null" json:"-"`
+	Username     string `gorm:"unique;not null" json:"username"`
+	PasswordHash string `gorm:"not null" json:"-"`
 
 	// 外鍵與關聯的物件
-	RoleID	uint	`gorm:"not null" json:"role_id"`
-	Role	Role	`json:"role,omitempty"`
+	RoleID uint `gorm:"not null" json:"role_id"`
+	Role   Role `json:"role,omitempty"`
 }
 
-type Role struct{
+type Role struct {
 	gorm.Model
-	Name	string	`gorm:"unique;not null" json:"name"`
-	Permissions []Permission	`gorm:"many2many:role_permissions;" json:"permissions,omitempty"`
+	Name        string       `gorm:"unique;not null" json:"name"`
+	Permissions []Permission `gorm:"many2many:role_permissions;" json:"permissions,omitempty"`
 }
 
-type Permission struct{
+type Permission struct {
 	gorm.Model
-	Name	string	`gorm:"unique;not null" json:"name"`
-	Roles []Role	`gorm:"many2many:role_permissions;" json:"roles,omitempty"`
+	Name  string `gorm:"unique;not null" json:"name"`
+	Roles []Role `gorm:"many2many:role_permissions;" json:"roles,omitempty"`
 }
 
 type Problem struct {
 	gorm.Model
-	ProblemCode  string		`gorm:"unique;not null" json:"problemCode"`
-	LimitTime    int		`json:"limit_time"` // TLE 秒數
-	ProblemPath  string		`json:"-"`
+	ProblemCode string `gorm:"unique;not null" json:"problemCode"`
+	LimitTime   int    `json:"limit_time"` // TLE 秒數
+	ProblemPath string `json:"-"`
 }
 
 type Submission struct {
 	gorm.Model
-	OperatorID	string	`gorm:"unique;not null" json:"operatorId"`
+	OperatorID string `gorm:"unique;not null" json:"operatorId"`
 
 	// 外鍵與關聯的物件
-	UserID	uint	`gorm:"not null" json:"user_id"`
-	User 	User	`json:"user,omitempty"`
+	UserID uint `gorm:"not null" json:"user_id"`
+	User   User `json:"user,omitempty"`
 
 	// 外鍵與關聯的物件
-	ProblemID	uint	`gorm:"not null" json:"problem_id"`
-	Problem		Problem	`json:"problem,omitempty"`
+	ProblemID uint    `gorm:"not null" json:"problem_id"`
+	Problem   Problem `json:"problem,omitempty"`
 
 	Status  string `gorm:"default:'Pending'" json:"status"`
 	Message string `json:"message"`

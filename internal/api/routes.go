@@ -3,6 +3,8 @@
 package api
 
 import (
+	"online-judge/internal/middleware"
+
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -11,23 +13,23 @@ func RegisterRoutes(router *gin.Engine, db *gorm.DB, jobQueue chan string) {
 	// 使用者相關
 	router.POST("/api/users/register", UserRegisterHandler(db))
 	router.POST("/api/users/login", UserLoginHandler(db))
-	router.POST("/api/users/logout", UserLogoutHandler(db))
-	router.GET("/api/users/me", GetUserProfileHandler(db))
+	router.POST("/api/users/logout", middleware.AuthMiddleware(), UserLogoutHandler(db))
+	router.GET("/api/users/me", middleware.AuthMiddleware(), GetUserProfileHandler(db))
 	router.GET("/api/users/:userId/submissions", GetUserSubmissionsHandler(db))
 
 	// 題目相關
 	router.GET("/api/problems", GetAllProblemsHandler(db))
 	router.GET("/api/problems/:problemId", GetProblemDetailHandler(db))
-	router.PUT("/api/problems", UpdateProblemHandler)
-	router.DELETE("/api/problems/:problemId", DeleteProblemHandler)
-	router.GET("/api/problems/:problemId/testcases", GetProblemTestCasesHandler)
+	router.PUT("/api/problems", middleware.AuthMiddleware(), UpdateProblemHandler)
+	router.DELETE("/api/problems/:problemId", middleware.AuthMiddleware(), DeleteProblemHandler)
+	router.GET("/api/problems/:problemId/testcases", middleware.AuthMiddleware(), GetProblemTestCasesHandler)
 
 	// 提交相關
-	router.POST("/api/submissions", CreateSubmissionHandler(db, jobQueue))
-	router.GET("/api/submissions/:operatorId/source", GetSubmissionSourceHandler(db))
-	router.GET("/api/submissions/:operatorId/logs/:logType", GetSubmissionLogHandler(db))
-	router.GET("/api/submissions/:operatorId", GetSubmissionResultHandler(db))
-	router.GET("/api/submissions", GetSubmissionsHandler(db))
+	router.POST("/api/submissions", middleware.AuthMiddleware(), CreateSubmissionHandler(db, jobQueue))
+	router.GET("/api/submissions/:operatorId/source", middleware.AuthMiddleware(), GetSubmissionSourceHandler(db))
+	router.GET("/api/submissions/:operatorId/logs/:logType", middleware.AuthMiddleware(), GetSubmissionLogHandler(db))
+	router.GET("/api/submissions/:operatorId", middleware.AuthMiddleware(), GetSubmissionResultHandler(db))
+	router.GET("/api/submissions", middleware.AuthMiddleware(), GetSubmissionsHandler(db))
 
 	// 統計相關
 	router.GET("/api/stats/problems/:problemId", GetProblemStatsHandler)
