@@ -138,15 +138,6 @@ func loadSubmission(db *gorm.DB, submissionId string) (*models.Submission, error
 	return &submission, nil
 }
 
-// 從資料庫中讀取 problem，如果找不到就回傳錯誤
-// func loadProblem(db *gorm.DB, problemId uint) (*models.Problem, error) {
-// 	problem := models.Problem{}
-// 	if err := db.Where("problem_id = ?", problemCode).First(&problem).Error; err != nil {
-// 		return nil, err
-// 	}
-// 	return &problem, nil
-// }
-
 // 解壓縮上傳的 zip 檔案到 submission.WorkspacePath 目錄下
 func prepareWorkspace(submission *models.Submission) error {
 	if err := unzipFile(submission.SourcePath, submission.WorkspacePath); err != nil {
