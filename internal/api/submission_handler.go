@@ -109,8 +109,8 @@ func GetSubmissionResultHandler(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		// 解析出 userID 確認身分：只能查詢自己的提交結果
-		if submission.UserID != c.GetUint("userID") {
+		// 確認 ownership
+		if !CanAccessUserResource(c, submission.UserID){
 			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 			return
 		}
@@ -135,8 +135,8 @@ func GetSubmissionSourceHandler(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		// 解析出 userID 確認身分：只能取得自己提交的程式碼
-		if submission.UserID != c.GetUint("userID") {
+		// 確認 ownership
+		if !CanAccessUserResource(c, submission.UserID){
 			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 			return
 		}
@@ -157,8 +157,8 @@ func GetSubmissionLogHandler(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		// 解析出 userID 確認身分：只能查詢自己的提交結果的 log
-		if submission.UserID != c.GetUint("userID") {
+		// 確認 ownership
+		if !CanAccessUserResource(c, submission.UserID){
 			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 			return
 		}

@@ -1,7 +1,9 @@
+// 負責 JWT 的簽發、驗證，以及 Gin 認證 Middleware 的處理
 package middleware
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"strings"
@@ -16,6 +18,20 @@ type Claims struct {
 	Username string `json:"username"`
 	Role     string `json:"role"`
 	jwt.RegisteredClaims
+}
+
+func privateKeyPath() (string, error) {
+	if path := os.Getenv("JWT_PRIVATE_KEY_PATH"); path != "" {
+		return path, nil
+	}
+	return "", errors.New("JWT_PRIVATE_KEY_PATH is not set")
+}
+
+func publicKeyPath() (string, error) {
+	if path := os.Getenv("JWT_PUBLIC_KEY_PATH"); path != "" {
+		return path, nil
+	}
+	return "", errors.New("JWT_PUBLIC_KEY_PATH is not set")
 }
 
 // 生成 JWT 並回傳 JWT
@@ -35,13 +51,17 @@ func GenerateJWT(userID uint, username string, role string) (string, error) {
 
 	// 2. 用私鑰簽章
 	// 取得 private_key
-	pemBytes, err := os.ReadFile("keys/private.pem")
+	keyPath, err := privateKeyPath()
 	if err != nil {
 		return "", err
 	}
+	pemBytes, err := os.ReadFile(keyPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read private key %q: %w", keyPath, err)
+	}
 	privateKey, err := jwt.ParseECPrivateKeyFromPEM(pemBytes)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to parse private key %q: %w", keyPath, err)
 	}
 
 	tokenString, err := token.SignedString(privateKey)
@@ -56,13 +76,17 @@ func GenerateJWT(userID uint, username string, role string) (string, error) {
 // 驗證 JWT，回傳 Claims 內容
 func ParseToken(tokenString string) (*Claims, error) {
 	// 取得 public_key
-	pemBytes, err := os.ReadFile("keys/public.pem")
+	keyPath, err := publicKeyPath()
 	if err != nil {
 		return nil, err
 	}
+	pemBytes, err := os.ReadFile(keyPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read public key %q: %w", keyPath, err)
+	}
 	publicKey, err := jwt.ParseECPublicKeyFromPEM(pemBytes)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse public key %q: %w", keyPath, err)
 	}
 
 	claims := &Claims{}

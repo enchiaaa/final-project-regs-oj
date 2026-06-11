@@ -3,6 +3,7 @@
 package api
 
 import (
+	"online-judge/internal/rbac"
 	"online-judge/internal/middleware"
 
 	"github.com/gin-gonic/gin"
@@ -14,22 +15,22 @@ func RegisterRoutes(router *gin.Engine, db *gorm.DB, jobQueue chan string) {
 	router.POST("/api/users/register", UserRegisterHandler(db))
 	router.POST("/api/users/login", UserLoginHandler(db))
 	router.POST("/api/users/logout", middleware.AuthMiddleware(), UserLogoutHandler(db))
-	router.GET("/api/users/me", middleware.AuthMiddleware(), GetUserProfileHandler(db))
+	router.GET("/api/users/me", middleware.AuthMiddleware(), middleware.RequirePermission(db, rbac.PermissionUserRead), GetUserProfileHandler(db))
 	router.GET("/api/users/:userId/submissions", GetUserSubmissionsHandler(db))
 
 	// 題目相關
 	router.GET("/api/problems", GetAllProblemsHandler(db))
 	router.GET("/api/problems/:problemId", GetProblemDetailHandler(db))
-	router.PUT("/api/problems", middleware.AuthMiddleware(), UpdateProblemHandler)
-	router.DELETE("/api/problems/:problemId", middleware.AuthMiddleware(), DeleteProblemHandler)
-	router.GET("/api/problems/:problemId/testcases", middleware.AuthMiddleware(), GetProblemTestCasesHandler)
+	router.PUT("/api/problems", middleware.AuthMiddleware(), middleware.RequirePermission(db, rbac.PermissionProblemUpsert), UpdateProblemHandler)
+	router.DELETE("/api/problems/:problemId", middleware.AuthMiddleware(), middleware.RequirePermission(db, rbac.PermissionProblemDelete), DeleteProblemHandler)
+	router.GET("/api/problems/:problemId/testcases", middleware.AuthMiddleware(), middleware.RequirePermission(db, rbac.PermissionProblemTestcasesRead), GetProblemTestCasesHandler)
 
 	// 提交相關
-	router.POST("/api/submissions", middleware.AuthMiddleware(), CreateSubmissionHandler(db, jobQueue))
-	router.GET("/api/submissions/:operatorId/source", middleware.AuthMiddleware(), GetSubmissionSourceHandler(db))
-	router.GET("/api/submissions/:operatorId/logs/:logType", middleware.AuthMiddleware(), GetSubmissionLogHandler(db))
-	router.GET("/api/submissions/:operatorId", middleware.AuthMiddleware(), GetSubmissionResultHandler(db))
-	router.GET("/api/submissions", middleware.AuthMiddleware(), GetSubmissionsHandler(db))
+	router.POST("/api/submissions", middleware.AuthMiddleware(), middleware.RequirePermission(db, rbac.PermissionSubmissionCreate), CreateSubmissionHandler(db, jobQueue))
+	router.GET("/api/submissions/:operatorId/source", middleware.AuthMiddleware(), middleware.RequirePermission(db, rbac.PermissionSubmissionSourceRead), GetSubmissionSourceHandler(db))
+	router.GET("/api/submissions/:operatorId/logs/:logType", middleware.AuthMiddleware(), middleware.RequirePermission(db, rbac.PermissionSubmissionLogRead), GetSubmissionLogHandler(db))
+	router.GET("/api/submissions/:operatorId", middleware.AuthMiddleware(), middleware.RequirePermission(db, rbac.PermissionSubmissionRead), GetSubmissionResultHandler(db))
+	router.GET("/api/submissions", middleware.AuthMiddleware(), middleware.RequirePermission(db, rbac.PermissionSubmissionRead), GetSubmissionsHandler(db))
 
 	// 統計相關
 	router.GET("/api/stats/problems/:problemId", GetProblemStatsHandler)
