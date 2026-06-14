@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -18,17 +17,6 @@ import (
 // /api/submissions POST 上傳提交，並建立評測任務
 func CreateSubmissionHandler(db *gorm.DB, jobQueue chan string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// 取得上傳檔案，並檢查是否為 zip 格式
-		file, err := c.FormFile("file")
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to get uploaded file"})
-			return
-		}
-		if filepath.Ext(strings.ToLower(file.Filename)) != ".zip" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Only zip files are allowed"})
-			return
-		}
-
 		// 生成唯一的 operatorId
 		operatorId := uuid.New().String()
 
@@ -49,18 +37,10 @@ func CreateSubmissionHandler(db *gorm.DB, jobQueue chan string) gin.HandlerFunc 
 			return
 		}
 
-		// 將上傳的檔案儲存到指定路徑 "uploads/{userName}/{problemCode}/{operatorId}.ext"
-		ext := filepath.Ext(strings.ToLower(file.Filename))
-		dst := filepath.Join("uploads", user.Username, problemCode, operatorId+ext)
-
-		// 0755 是 Linux 的檔案權限，表示擁有者有讀寫執行權限，群組和其他人只有讀取和執行權限
-		cmd := os.MkdirAll(filepath.Dir(dst), 0755)
-		if cmd != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create directory"})
-			return
-		}
-		if err := c.SaveUploadedFile(file, dst); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save uploaded file"})
+		// 檢查上傳的檔案，並儲存到指定路徑 "uploads/{userName}/{problemCode}/{operatorId}.zip"
+		dst := filepath.Join("uploads", user.Username, problemCode, operatorId + ".zip")
+		if statusCode, err := SaveUploadedZipFile(c, "file", dst); err != nil{
+			c.JSON(statusCode, gin.H{"error": err.Error()})
 			return
 		}
 
