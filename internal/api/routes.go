@@ -3,8 +3,8 @@
 package api
 
 import (
-	"online-judge/internal/rbac"
 	"online-judge/internal/middleware"
+	"online-judge/internal/rbac"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -21,7 +21,7 @@ func RegisterRoutes(router *gin.Engine, db *gorm.DB, jobQueue chan string) {
 	// 題目相關
 	router.GET("/api/problems", GetAllProblemsHandler(db))
 	router.GET("/api/problems/:problemId", GetProblemDetailHandler(db))
-	router.PUT("/api/problems", middleware.AuthMiddleware(), middleware.RequirePermission(db, rbac.PermissionProblemUpsert), UpdateProblemHandler)
+	router.PUT("/api/problems", middleware.AuthMiddleware(), middleware.RequirePermission(db, rbac.PermissionProblemUpsert), UpsertProblemHandler(db))
 	router.DELETE("/api/problems/:problemId", middleware.AuthMiddleware(), middleware.RequirePermission(db, rbac.PermissionProblemDelete), DeleteProblemHandler)
 	router.GET("/api/problems/:problemId/testcases", middleware.AuthMiddleware(), middleware.RequirePermission(db, rbac.PermissionProblemTestcasesRead), GetProblemTestCasesHandler)
 

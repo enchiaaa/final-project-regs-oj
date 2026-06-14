@@ -119,7 +119,9 @@ func UserLoginHandler(db *gorm.DB) gin.HandlerFunc {
 
 // /api/users/logout POST 登出
 func UserLogoutHandler(db *gorm.DB) gin.HandlerFunc {
-	return func(c *gin.Context) {}
+	return func(c *gin.Context) {
+
+	}
 }
 
 // /api/users/me GET 取得自己的資料
@@ -139,5 +141,18 @@ func GetUserProfileHandler(db *gorm.DB) gin.HandlerFunc {
 
 // /api/users/:userId/submissions GET 取得指定使用者的提交紀錄
 func GetUserSubmissionsHandler(db *gorm.DB) gin.HandlerFunc {
-	return func(c *gin.Context) {}
+	return func(c *gin.Context) {
+		userID := c.Param("userId")
+		submissions := []models.Submission{}
+
+		if err := db.Where("user_id = ?", userID).Find(&submissions).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to query submissions"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"user_id":  userID,
+			"submissions": submissions,
+		})
+	}
 }
