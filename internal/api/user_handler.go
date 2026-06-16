@@ -3,6 +3,7 @@ package api
 
 import (
 	"errors"
+	"log"
 	"net/http"
 	"online-judge/internal/middleware"
 	"online-judge/internal/models"
@@ -14,7 +15,7 @@ import (
 
 type UserRegisterRequest struct {
 	Username string `json:"username" form:"username" binding:"required"`
-	Password string `json:"password" form:"password" binding:"required,min=8"`
+	Password string `json:"password" form:"password" binding:"required"`
 }
 type UserLoginRequest struct {
 	Username string `json:"username" form:"username" binding:"required"`
@@ -105,6 +106,7 @@ func UserLoginHandler(db *gorm.DB) gin.HandlerFunc {
 		// 生成 JWT
 		jwtToken, err := middleware.GenerateJWT(existingUser.ID, existingUser.Username, existingUser.Role.Name)
 		if err != nil {
+			log.Printf("login failed: generate token error: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate token"})
 			return
 		}
@@ -142,17 +144,39 @@ func GetUserProfileHandler(db *gorm.DB) gin.HandlerFunc {
 // /api/users/:userId/submissions GET 取得指定使用者的提交紀錄
 func GetUserSubmissionsHandler(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// 1. 檢查 user 是否存在
 		userID := c.Param("userId")
-		submissions := []models.Submission{}
+		user := models.User{}
+		if err := db.First(&user, userID).Error; err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+			return
+		}
 
-		if err := db.Where("user_id = ?", userID).Find(&submissions).Error; err != nil {
+		// 2. 取得 user 的 submission
+		submissions := []models.Submission{}
+		if err := db.Preload("Problem").Where("user_id = ?", userID).Find(&submissions).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to query submissions"})
 			return
 		}
 
+		// 3. 計算回傳資料
+		type UserSubmissionResponse struct {
+			ProblemCode string `json:"problemCode"`
+			Status      string `json:"status"`
+		}
+		items := []UserSubmissionResponse{}
+
+		for _, submission := range submissions {
+			items = append(items, UserSubmissionResponse{
+				ProblemCode: submission.Problem.ProblemCode,
+				Status:      submission.Status,
+			})
+		}
+
+		// 4. 回傳資料
 		c.JSON(http.StatusOK, gin.H{
 			"user_id":  userID,
-			"submissions": submissions,
+			"submissions": items,
 		})
 	}
 }

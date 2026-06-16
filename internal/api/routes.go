@@ -22,8 +22,8 @@ func RegisterRoutes(router *gin.Engine, db *gorm.DB, jobQueue chan string) {
 	router.GET("/api/problems", GetAllProblemsHandler(db))
 	router.GET("/api/problems/:problemId", GetProblemDetailHandler(db))
 	router.PUT("/api/problems", middleware.AuthMiddleware(), middleware.RequirePermission(db, rbac.PermissionProblemUpsert), UpsertProblemHandler(db))
-	router.DELETE("/api/problems/:problemId", middleware.AuthMiddleware(), middleware.RequirePermission(db, rbac.PermissionProblemDelete), DeleteProblemHandler)
-	router.GET("/api/problems/:problemId/testcases", middleware.AuthMiddleware(), middleware.RequirePermission(db, rbac.PermissionProblemTestcasesRead), GetProblemTestCasesHandler)
+	router.DELETE("/api/problems/:problemId", middleware.AuthMiddleware(), middleware.RequirePermission(db, rbac.PermissionProblemDelete), DeleteProblemHandler(db))
+	router.GET("/api/problems/:problemId/testcases", middleware.AuthMiddleware(), middleware.RequirePermission(db, rbac.PermissionProblemTestcasesRead), GetProblemTestCasesHandler(db))
 
 	// 提交相關
 	router.POST("/api/submissions", middleware.AuthMiddleware(), middleware.RequirePermission(db, rbac.PermissionSubmissionCreate), CreateSubmissionHandler(db, jobQueue))
@@ -33,6 +33,6 @@ func RegisterRoutes(router *gin.Engine, db *gorm.DB, jobQueue chan string) {
 	router.GET("/api/submissions", middleware.AuthMiddleware(), middleware.RequirePermission(db, rbac.PermissionSubmissionRead), GetSubmissionsHandler(db))
 
 	// 統計相關
-	router.GET("/api/stats/problems/:problemId", GetProblemStatsHandler)
-	router.GET("/api/stats/users/:userId", GetUserStatsHandler)
+	router.GET("/api/stats/problems/:problemId", GetProblemStatsHandler(db))
+	router.GET("/api/stats/users/:userId", GetUserStatsHandler(db))
 }

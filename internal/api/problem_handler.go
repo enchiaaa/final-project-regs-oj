@@ -55,12 +55,12 @@ func GetAllProblemsHandler(db *gorm.DB) gin.HandlerFunc {
 	}
 }
 
-// /api/problems/:problemCode
+// /api/problems/:problemId
 func GetProblemDetailHandler(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		id := c.Param("problemCode")
+		id := c.Param("problemId")
 		var problem models.Problem
-		if err := db.First(&problem, "problem_code = ?", id).Error; err != nil {
+		if err := db.First(&problem, "id = ?", id).Error; err != nil {
 			c.JSON(http.StatusNotFound, gin.H{
 				"error": "題目不存在",
 			})
@@ -210,8 +210,63 @@ func UpsertProblemHandler(db *gorm.DB) gin.HandlerFunc{
 	}
 }
 
-func DeleteProblemHandler(c *gin.Context) {
+// /api/problems/:problemId
+func DeleteProblemHandler(db *gorm.DB) gin.HandlerFunc{
+	return func(c *gin.Context) {
+		// 1. 檢查 problem 是否存在
+		id := c.Param("problemId")
+		var problem models.Problem
+		if err := db.First(&problem, "id = ?", id).Error; err != nil {
+			c.JSON(http.StatusNotFound, gin.H{
+				"error": "題目不存在",
+			})
+			return
+		}
+
+		// 2. 刪除
+		if err := db.Delete(&problem).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "Failed to delete problem",
+			})
+			return
+		}
+
+		// 3. 回傳
+		c.JSON(http.StatusOK, "ok")
+	}
 }
 
-func GetProblemTestCasesHandler(c *gin.Context) {
+// /api/problems/:problemId/testcases
+func GetProblemTestCasesHandler(db *gorm.DB) gin.HandlerFunc{
+	return func(c *gin.Context) {
+		// 1. 檢查 problem 是否存在
+		id := c.Param("problemId")
+		var problem models.Problem
+		if err := db.First(&problem, "id = ?", id).Error; err != nil {
+			c.JSON(http.StatusNotFound, gin.H{
+				"error": "題目不存在",
+			})
+			return
+		}
+
+		// 2. 建立題目壓縮檔
+		srcDir := problem.ProblemPath
+
+		tmpDir := filepath.Join("tmp", "problem-download", uuid.New().String())
+		dstPath := filepath.Join(tmpDir, problem.ProblemCode+".zip")
+	
+		if err := os.MkdirAll(tmpDir, 0o755); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create folder"})
+			return
+		}
+		// defer os.RemoveAll(tmpDir)
+
+		if err := utils.ZipDir(srcDir, dstPath); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to zip file"})
+			return
+		}
+
+		// 3. 回傳
+		c.File(dstPath)
+	}
 }
