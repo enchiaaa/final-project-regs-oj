@@ -2,7 +2,6 @@
 package judge
 
 import (
-	"encoding/xml"
 	"errors"
 	"fmt"
 	"log"
@@ -104,7 +103,7 @@ func runJudgingProcess(db *gorm.DB, submissionId string) {
 
 	// 若 result.xml 存在
 	if _, resultErr := os.Stat(resultPath); resultErr == nil {
-		ok, err := checkTestResults(resultPath)
+		ok, err := checkTestResults(resultPath, submission.Problem.ProblemPath)
 		if err != nil {
 			finishSubmission(db, submission, "RE", "Failed to check test results: "+err.Error())
 			return
@@ -313,25 +312,6 @@ func runDockerRun(submission *models.Submission) error {
 	}
 
 	return fmt.Errorf("result.xml not found")
-}
-
-// 查看 result.xml 的內容，確認是否有測資沒有通過
-func checkTestResults(resultPath string) (bool, error) {
-	type TestCaseResult struct {
-		Failures int `xml:"failures,attr"`
-	}
-
-	resultFile, err := os.ReadFile(resultPath)
-	if err != nil {
-		return false, fmt.Errorf("failed to read result file: %w", err)
-	}
-
-	var testResult TestCaseResult
-	if err := xml.Unmarshal(resultFile, &testResult); err != nil {
-		return false, fmt.Errorf("failed to parse result file: %w", err)
-	}
-
-	return testResult.Failures == 0, nil
 }
 
 // 將評測過程中的錯誤訊息記錄到系統中，供管理員查看

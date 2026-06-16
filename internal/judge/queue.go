@@ -7,14 +7,21 @@ import (
 	"gorm.io/gorm"
 )
 
+const maxConcurrentJudges = 2
+
 func StartWorker(db *gorm.DB, jobQueue chan string) {
-	for {
-		// 從 jobQueue 拿 operatorId 來評測
-		id, ok := <-jobQueue
-		if !ok {
-			return
-		}
-		fmt.Printf("Start judging submission %s\n", id)
-		go runJudgingProcess(db, id)
+	sem := make(chan struct{}, maxConcurrentJudges)
+
+	for id := range jobQueue {
+		sem <- struct{}{}
+
+		go func(operatorID string) {
+			defer func() {
+				<-sem
+			}()
+
+			fmt.Printf("Start judging submission %s\n", operatorID)
+			runJudgingProcess(db, operatorID)
+		}(id)
 	}
 }
