@@ -8,6 +8,7 @@ import (
 	"online-judge/internal/models"
 	"online-judge/internal/utils"
 	"os"
+	"regexp"
 
 	"path/filepath"
 
@@ -15,6 +16,8 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
+
+var problemCodePattern = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
 
 type ProblemListItemResponse struct {
 	ProblemCode string `json:"problemCode"`
@@ -80,8 +83,14 @@ func GetProblemDetailHandler(db *gorm.DB) gin.HandlerFunc {
 // /api/problems
 func UpsertProblemHandler(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// TODO: problemCode 驗證：不能是空字串、只能有英數字 or - or _、不允許 /、\、.、空白
 		problemCode := c.PostForm("problemCode")
+		if !problemCodePattern.MatchString(problemCode) {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "problemCode 只能包含英文字母、數字、- 或 _",
+			})
+			return
+		}
+
 		operationId := uuid.New().String()
 
 		sourceDst := filepath.Join("tmp", "problem-staging", problemCode, operationId, "source.zip")

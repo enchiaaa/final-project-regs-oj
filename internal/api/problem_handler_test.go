@@ -49,12 +49,16 @@ func setupProblemTestRouter(db *gorm.DB) *gin.Engine {
 }
 
 func newProblemUploadRequest(t *testing.T, uploadFilename string, content []byte) *http.Request {
+	return newProblemUploadRequestWithCode(t, problemCode, uploadFilename, content)
+}
+
+func newProblemUploadRequestWithCode(t *testing.T, code string, uploadFilename string, content []byte) *http.Request {
 	t.Helper()
 
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
 
-	if err := writer.WriteField("problemCode", problemCode); err != nil {
+	if err := writer.WriteField("problemCode", code); err != nil {
 		t.Fatalf("failed to write problemCode field: %v", err)
 	}
 
@@ -203,6 +207,32 @@ func TestGetProblemDetailHandler(t *testing.T) {
 
 func TestUpsertProblemHandler(t *testing.T) {
 	gin.SetMode(gin.TestMode)
+
+	t.Run("invalid problemCode", func(t *testing.T) {
+		invalidCodes := []string{
+			"",
+			"../problem",
+			`..\problem`,
+			"problem/code",
+			"problem.code",
+			"problem code",
+		}
+
+		for _, code := range invalidCodes {
+			t.Run(code, func(t *testing.T) {
+				testDB := testutil.SetupTestDB(t)
+				router := setupProblemTestRouter(testDB)
+
+				w := httptest.NewRecorder()
+				req := newProblemUploadRequestWithCode(t, code, "problem.zip", nil)
+				router.ServeHTTP(w, req)
+
+				if w.Code != http.StatusBadRequest {
+					t.Fatalf("expected 400, got %d\nbody: %s", w.Code, w.Body.String())
+				}
+			})
+		}
+	})
 
 	t.Run("Insert Problem", func(t *testing.T) {
 		// 1. 建立 Test DB
@@ -503,7 +533,78 @@ func TestDeleteProblemHandler(t *testing.T) {
 }
 
 func TestGetProblemTestCasesHandler(t *testing.T) {
+	t.Run("成功下載題目 ZIP", func(t *testing.T) {
+		// 1. 建立 Test DB
+		testDB := testutil.SetupTestDB(t)
 
+		// 2. 建立 Problem
+		problem := testutil.CreateTestProblem(t, testDB, "test-problem")
+
+		// 3. 建立題目資料夾與測試檔案
+		problemRoot := problem.ProblemPath
+		archivePath := filepath.Join(problemRoot, "testProblem.txt")
+		archive, err := os.Create(archivePath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer archive.Close()
+
+		// 4. 建立 router
+		router := gin.New()
+		router.GET("/api/problems/:problemId/testcases", GetProblemTestCasesHandler(testDB))
+
+		// 5. 呼叫 API
+		w := httptest.NewRecorder()
+		url := fmt.Sprintf("/api/problems/%d/testcases", problem.ID)
+		req := httptest.NewRequest(http.MethodGet, url, nil)
+		router.ServeHTTP(w, req)
+
+		// 6. 確認 HTTP 200
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected HTTP 200, got %d\nbody: %s", w.Code, w.Body.String())
+		}
+
+		// 7. 將 response body 當作 ZIP 開啟
+		reader, err := zip.NewReader(
+			bytes.NewReader(w.Body.Bytes()),
+			int64(w.Body.Len()),
+		)
+		if err != nil {
+			t.Fatalf("response is not a valid ZIP: %v", err)
+		}
+
+		// 8. 確認 ZIP 內有預期檔案
+		found := false
+		for _, file := range reader.File {
+			if file.Name == "testProblem.txt" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatal("expected testProblem.txt in downloaded ZIP")
+		}
+	})
+
+	t.Run("題目不存在", func(t *testing.T) {
+		// 1. 建立 Test DB
+		testDB := testutil.SetupTestDB(t)
+
+		// 2. 建立 router
+		router := gin.New()
+		router.GET("/api/problems/:problemId/testcases", GetProblemTestCasesHandler(testDB))
+
+		// 5. 呼叫 API
+		w := httptest.NewRecorder()
+		url := "/api/problems/1/testcases"
+		req := httptest.NewRequest(http.MethodGet, url, nil)
+		router.ServeHTTP(w, req)
+
+		// 6. 確認 HTTP 200
+		if w.Code != http.StatusNotFound {
+			t.Fatalf("expected HTTP 404, got %d\nbody: %s", w.Code, w.Body.String())
+		}
+	})
 }
 
 type File struct {
