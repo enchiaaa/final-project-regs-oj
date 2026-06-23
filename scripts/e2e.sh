@@ -422,11 +422,11 @@ USER_DELETE_STATUS=$(
 assert_http_status "$USER_DELETE_STATUS" "403" "User problem delete authorization"
 
 # 9. 其他最終狀態
-# run_status_case "WA" "$WA_SUBMISSION_ZIP"
-# run_status_case "CE" "$CE_SUBMISSION_ZIP"
-# run_status_case "SE" "$SE_SUBMISSION_ZIP"
-# run_status_case "RE" "$RE_SUBMISSION_ZIP"
-# run_status_case "TLE" "$TLE_SUBMISSION_ZIP"
+run_status_case "WA" "$WA_SUBMISSION_ZIP"
+run_status_case "CE" "$CE_SUBMISSION_ZIP"
+run_status_case "SE" "$SE_SUBMISSION_ZIP"
+run_status_case "RE" "$RE_SUBMISSION_ZIP"
+run_status_case "TLE" "$TLE_SUBMISSION_ZIP"
 
 # 10. Logout
 LOGOUT_RESPONSE=$(
