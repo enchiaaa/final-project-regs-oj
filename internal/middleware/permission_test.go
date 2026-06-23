@@ -10,7 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func TestRequirePermission(t *testing.T){
+func TestRequirePermission(t *testing.T) {
 	// 建立 Test DB
 	testDB := testutil.SetupTestDB(t)
 
@@ -38,7 +38,7 @@ func TestRequirePermission(t *testing.T){
 	// user: StatusForbidden
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", "/test", nil)
-	req.Header.Set("Authorization", "Bearer " + userToken)
+	req.Header.Set("Authorization", "Bearer "+userToken)
 	router.ServeHTTP(w, req)
 	if w.Code != http.StatusForbidden {
 		t.Fatalf("expected StatusForbidden, got %d", w.Code)
@@ -47,7 +47,7 @@ func TestRequirePermission(t *testing.T){
 	// valid token -> expect 200
 	w = httptest.NewRecorder()
 	req, _ = http.NewRequest("GET", "/test", nil)
-	req.Header.Set("Authorization", "Bearer "+ adminToken)
+	req.Header.Set("Authorization", "Bearer "+adminToken)
 	router.ServeHTTP(w, req)
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)

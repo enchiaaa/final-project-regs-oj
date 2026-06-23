@@ -57,11 +57,11 @@ func GetProblemStatsHandler(db *gorm.DB) gin.HandlerFunc {
 
 		// 3. 回傳資料
 		c.JSON(http.StatusOK, gin.H{
-			"problemId":           problem.ID,
-			"problemCode":         problem.ProblemCode,
-			"title":               problem.Title,
-			"totalSubmissions":    totalSubmissions,
-			"statusCounts":        statusRowsToMap(rows),
+			"problemId":        problem.ID,
+			"problemCode":      problem.ProblemCode,
+			"title":            problem.Title,
+			"totalSubmissions": totalSubmissions,
+			"statusCounts":     statusRowsToMap(rows),
 		})
 	}
 }

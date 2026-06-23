@@ -2,8 +2,8 @@
 package database
 
 import (
-	"online-judge/internal/rbac"
 	"online-judge/internal/models"
+	"online-judge/internal/rbac"
 
 	"gorm.io/gorm"
 )

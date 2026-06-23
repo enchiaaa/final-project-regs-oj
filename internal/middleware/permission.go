@@ -10,11 +10,11 @@ import (
 )
 
 // 確認使用者是否有權限
-func RequirePermission(db *gorm.DB, permissionName string) gin.HandlerFunc{
+func RequirePermission(db *gorm.DB, permissionName string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		roleName := c.GetString("role")
 		role := models.Role{}
-		if err :=db.Preload("Permissions").Where("name = ?", roleName).First(&role).Error; err != nil{
+		if err := db.Preload("Permissions").Where("name = ?", roleName).First(&role).Error; err != nil {
 			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "can't get role in database"})
 			return
 		}

@@ -30,8 +30,8 @@ type Permission struct {
 type Problem struct {
 	gorm.Model
 	ProblemCode string `gorm:"unique;not null" json:"problemCode"`
-	Title		string `json:"title"`
-	LimitTime   int    `json:"limit_time"` // TLE 秒數
+	Title       string `json:"title"`
+	LimitTime   int    `json:"limit_time"`
 	ProblemPath string `json:"-"`
 }
 

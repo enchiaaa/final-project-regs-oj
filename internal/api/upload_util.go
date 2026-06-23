@@ -33,18 +33,17 @@ func SaveUploadedZipFile(c *gin.Context, formKey string, dst string) (int, error
 	return http.StatusOK, nil
 }
 
-type LimitsConfig struct{
-	TotalTime	int	`yaml:"totalTime"`
-  	CpuTime		int	`yaml:"cpuTime"`
-	Memory		int	`yaml:"memory"`
-
+type LimitsConfig struct {
+	TotalTime int `yaml:"totalTime"`
+	CpuTime   int `yaml:"cpuTime"`
+	Memory    int `yaml:"memory"`
 }
 type YAMLConfig struct {
-	Title			string			`yaml:"title"`
-	LimitsConfig	LimitsConfig	`yaml:"limits"`
+	Title        string       `yaml:"title"`
+	LimitsConfig LimitsConfig `yaml:"limits"`
 }
 
-func ParseYAML(yamlPath string) (string, int, error){
+func ParseYAML(yamlPath string) (string, int, error) {
 	yamlFile, err := os.ReadFile(yamlPath)
 	if err != nil {
 		return "", 0, errors.New("Error reading YAML file")
@@ -54,6 +53,6 @@ func ParseYAML(yamlPath string) (string, int, error){
 	if err := yaml.Unmarshal(yamlFile, &config); err != nil {
 		return "", 0, errors.New("Error parsing YAML")
 	}
-	
+
 	return config.Title, config.LimitsConfig.TotalTime, nil
 }
