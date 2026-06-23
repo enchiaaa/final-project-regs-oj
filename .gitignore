@@ -1,3 +1,7 @@
 *.exe
 uploads/*
 tmp/*
+.env
+keys/
+.gotmp/
+.gocache/
