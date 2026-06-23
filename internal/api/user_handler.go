@@ -120,9 +120,11 @@ func UserLoginHandler(db *gorm.DB) gin.HandlerFunc {
 }
 
 // /api/users/logout POST 登出
-func UserLogoutHandler(db *gorm.DB) gin.HandlerFunc {
+func UserLogoutHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
-
+		c.JSON(http.StatusOK, gin.H{
+			"message": "Logout successfully",
+		})
 	}
 }
 
