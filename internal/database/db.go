@@ -3,6 +3,7 @@ package database
 
 import (
 	"fmt"
+	"os"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -10,7 +11,12 @@ import (
 
 // 初始化資料庫連線，並根據模型自動建立資料表
 func InitDB() *gorm.DB {
-	db, err := gorm.Open(postgres.Open("host=localhost user=user password=123 dbname=OJ_db sslmode=disable"), &gorm.Config{})
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		panic("DATABASE_URL environment variable is required")
+	}
+
+	db, err := gorm.Open(postgres.Open(databaseURL), &gorm.Config{})
 	if err != nil {
 		panic(fmt.Sprintf("failed to connect database: %v", err))
 	}
@@ -22,6 +28,10 @@ func InitDB() *gorm.DB {
 
 	if err := SeedRBAC(db); err != nil {
 		panic(fmt.Sprintf("failed to seed RBAC: %v", err))
+	}
+
+	if err := SeedAdmin(db); err != nil {
+		panic(fmt.Sprintf("failed to seed admin: %v", err))
 	}
 
 	fmt.Println("資料庫連線成功")
