@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -25,7 +24,7 @@ type Response struct {
 	Message string `json:"message"`
 }
 
-var settingsYAML = `
+const settingsYAML = `
 title: Voyage Log
 limits:
   totalTime: 1000
@@ -33,37 +32,83 @@ limits:
   memory: 524288
 `
 
-var invalidSettingYAML = `
+const invalidSettingYAML = `
 title: Voyage Log
 limits: totalTime: 1000`
 
 const problemCode = "114FinalQ006"
-func TestGetProblemHandler(t *testing.T){
+
+func setupProblemTestRouter(db *gorm.DB) *gin.Engine {
+	router := gin.New()
+	router.GET("/api/problems", GetAllProblemsHandler(db))
+	router.GET("/api/problems/:problemId", GetProblemDetailHandler(db))
+	router.PUT("/api/problems", UpsertProblemHandler(db))
+	router.DELETE("/api/problems/:problemId", DeleteProblemHandler(db))
+	router.GET("/api/problems/:problemId/testcases", GetProblemTestCasesHandler(db))
+	return router
+}
+
+func newProblemUploadRequest(t *testing.T, uploadFilename string, content []byte) *http.Request {
+	t.Helper()
+
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+
+	if err := writer.WriteField("problemCode", problemCode); err != nil {
+		t.Fatalf("failed to write problemCode field: %v", err)
+	}
+
+	part, err := writer.CreateFormFile("file", uploadFilename)
+	if err != nil {
+		t.Fatalf("failed to create upload field: %v", err)
+	}
+	if _, err := part.Write(content); err != nil {
+		t.Fatalf("failed to write upload content: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("failed to close multipart writer: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPut, "/api/problems", body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	return req
+}
+
+func newProblemZipUploadRequest(t *testing.T, filename string) *http.Request {
+	t.Helper()
+
+	content, err := os.ReadFile(filename)
+	if err != nil {
+		t.Fatalf("failed to read test ZIP %s: %v", filename, err)
+	}
+
+	return newProblemUploadRequest(t, filepath.Base(filename), content)
+}
+
+func TestGetProblemHandler(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
 	t.Run("題目列表正確回傳", func(t *testing.T) {
 		// 1. 建立 Test DB
 		testDB := testutil.SetupTestDB(t)
 
 		// 2. 寫入資料
 		newProblem := models.Problem{
-			ProblemCode:	problemCode,
-			Title:			"Voyage Log",
-			LimitTime: 		1000,
-			ProblemPath:	"testfile/problem/114FinalQ006",
+			ProblemCode: problemCode,
+			Title:       "Voyage Log",
+			LimitTime:   1000,
+			ProblemPath: "testfile/problem/114FinalQ006",
 		}
 		if err := testDB.Create(&newProblem).Error; err != nil {
 			t.Error(err)
 		}
 
 		// 3. 設定測試 router
-		gin.SetMode(gin.TestMode)
+		router := setupProblemTestRouter(testDB)
 
-		router := gin.New()
-		router.GET("/api/problems", GetAllProblemsHandler(testDB))
-
-		// 4. 寫上傳內容
-		body := &bytes.Buffer{}
+		// 4. Call API
 		w := httptest.NewRecorder()
-		req, _ := http.NewRequest("GET", "/api/problems", body)
+		req := httptest.NewRequest(http.MethodGet, "/api/problems", nil)
 		router.ServeHTTP(w, req)
 
 		// 5. 確認結果
@@ -86,22 +131,19 @@ func TestGetProblemHandler(t *testing.T){
 		}
 	})
 }
-func TestGetProblemDetailHandler(t *testing.T){
+func TestGetProblemDetailHandler(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
 	t.Run("Problem 不存在", func(t *testing.T) {
 		// 1. 建立 Test DB
 		testDB := testutil.SetupTestDB(t)
 
 		// 2. 設定測試 router
-		gin.SetMode(gin.TestMode)
+		router := setupProblemTestRouter(testDB)
 
-		router := gin.New()
-		router.GET("/api/problems/:problemId", GetProblemDetailHandler(testDB))
-
-		// 3. 寫上傳內容
-		body := &bytes.Buffer{}
+		// 3. Call API
 		w := httptest.NewRecorder()
-
-		req, _ := http.NewRequest("GET", "/api/problems/1", body)
+		req := httptest.NewRequest(http.MethodGet, "/api/problems/1", nil)
 		router.ServeHTTP(w, req)
 
 		// 4. 確認結果
@@ -115,34 +157,30 @@ func TestGetProblemDetailHandler(t *testing.T){
 
 		// 2. 寫入資料
 		newProblem := models.Problem{
-			ProblemCode:	problemCode,
-			Title:			"Voyage Log",
-			LimitTime: 		1000,
-			ProblemPath:	"testfile/problem/114FinalQ006",
+			ProblemCode: problemCode,
+			Title:       "Voyage Log",
+			LimitTime:   1000,
+			ProblemPath: "testfile/problem/114FinalQ006",
 		}
 		if err := testDB.Create(&newProblem).Error; err != nil {
 			t.Error(err)
 		}
 
 		// 3. 設定測試 router
-		gin.SetMode(gin.TestMode)
+		router := setupProblemTestRouter(testDB)
 
-		router := gin.New()
-		router.GET("/api/problems/:problemId", GetProblemDetailHandler(testDB))
-
-		// 4. 寫上傳內容
-		body := &bytes.Buffer{}
+		// 4. Call API
 		w := httptest.NewRecorder()
-		
+
 		url := fmt.Sprintf("/api/problems/%d", newProblem.ID)
-		req, _ := http.NewRequest("GET", url, body)
+		req := httptest.NewRequest(http.MethodGet, url, nil)
 		router.ServeHTTP(w, req)
 
 		// 5. 確認結果
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d\nbody: %s", w.Code, w.Body.String())
 		}
-		
+
 		var response ProblemDetailResponse
 		err := json.Unmarshal(w.Body.Bytes(), &response)
 		if err != nil {
@@ -164,116 +202,85 @@ func TestGetProblemDetailHandler(t *testing.T){
 }
 
 func TestUpsertProblemHandler(t *testing.T) {
-    t.Run("Insert Problem", func(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	t.Run("Insert Problem", func(t *testing.T) {
 		// 1. 建立 Test DB
 		testDB := testutil.SetupTestDB(t)
 
 		// 2. 設定測試 router
-		gin.SetMode(gin.TestMode)
-
-		router := gin.New()
-		router.PUT("/api/problems", UpsertProblemHandler(testDB))
+		router := setupProblemTestRouter(testDB)
 
 		// 3. 建立上傳壓縮檔
-		filename := problemCode + ".zip"
-		var files = []File {
-			{"template/", ""}, 
-			{"solution/", ""}, 
-			{"spec/", ""}, 
+		files := []File{
+			{"template/", ""},
+			{"solution/", ""},
+			{"spec/", ""},
 			{"online-judge/", ""},
 			{"settings.yaml", settingsYAML},
 		}
-		CreateZipFileForTest(t, problemCode, files)
+		filename := CreateZipFileForTest(t, problemCode, files)
 
-		file, err := os.Open(filename)
-		if err != nil {
-			t.Error(err)
-		}
-		defer file.Close()
-
-		// 4. 寫上傳內容
-		body := &bytes.Buffer{}
-		writer := multipart.NewWriter(body)
-
-		_ = writer.WriteField("problemCode", problemCode)
-		part, err := writer.CreateFormFile("file", filepath.Base(filename))
-		if err != nil {
-			t.Error(err)
-		}
-		_, err = io.Copy(part, file)
-		if err != nil {
-			t.Error(err)
-		}
-		_ = writer.Close()
-
-		// 5. Call API 前，確認 Problem 114FinalQ006 不存在
+		// 4. Call API 前，確認 Problem 114FinalQ006 不存在
 		problem := models.Problem{}
-		err = testDB.Where("problem_code = ?", problemCode).First(&problem).Error
-		if err == nil{
+		err := testDB.Where("problem_code = ?", problemCode).First(&problem).Error
+		if err == nil {
 			t.Fatalf("Problem existed before inserting")
-		} else { 
+		} else {
 			if !errors.Is(err, gorm.ErrRecordNotFound) {
-        		t.Error(err)
+				t.Error(err)
 			}
 		}
 
-		// 6. Call API
+		// 5. Call API
 		w := httptest.NewRecorder()
-		req, _ := http.NewRequest("PUT", "/api/problems", body)
-		req.Header.Add("Content-Type", writer.FormDataContentType())
+		req := newProblemZipUploadRequest(t, filename)
 		router.ServeHTTP(w, req)
 
-		// 7. 確認結果
+		// 6. 確認結果
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d\nbody: %s", w.Code, w.Body.String())
 		}
 
 		problem = models.Problem{}
 		err = testDB.Where("problem_code = ?", problemCode).First(&problem).Error
-		if err != nil{ 
+		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-        		t.Fatalf("Problem didn't exist after inserting")
+				t.Fatalf("Problem didn't exist after inserting")
 			} else {
-        		t.Error(err)
+				t.Error(err)
 			}
 		}
-    })
+	})
 
-    t.Run("Update Problem", func(t *testing.T) {
+	t.Run("Update Problem", func(t *testing.T) {
 		// 1. 建立 Test DB
 		testDB := testutil.SetupTestDB(t)
-		
+
 		// 2. 寫入資料
 		newProblem := models.Problem{
-			ProblemCode:	problemCode,
-			Title:			"Voyage Log",
-			LimitTime: 0,
-			ProblemPath:	"testfile/problem/114FinalQ006",
+			ProblemCode: problemCode,
+			Title:       "Voyage Log",
+			LimitTime:   0,
+			ProblemPath: "testfile/problem/114FinalQ006",
 		}
 		if err := testDB.Create(&newProblem).Error; err != nil {
 			t.Error(err)
 		}
 
 		// 3. 建立上傳壓縮檔
-		filename := problemCode + ".zip"
-		var files = []File {
-			{"template/new.txt", ""}, 
-			{"solution/", ""}, 
-			{"spec/", ""}, 
+		files := []File{
+			{"template/new.txt", ""},
+			{"solution/", ""},
+			{"spec/", ""},
 			{"online-judge/", ""},
 			{"settings.yaml", settingsYAML},
 		}
-		CreateZipFileForTest(t, problemCode, files)
-
-		file, err := os.Open(filename)
-		if err != nil {
-			t.Error(err)
-		}
-		defer file.Close()
+		filename := CreateZipFileForTest(t, problemCode, files)
 
 		// 4. 建立 Problem 資料夾，用 old.txt 標記為舊題目
 		problemPath := "testfile/problem/" + problemCode
-		err = os.MkdirAll(filepath.Join(problemPath), 0755)
+		err := os.MkdirAll(filepath.Join(problemPath), 0755)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -283,50 +290,31 @@ func TestUpsertProblemHandler(t *testing.T) {
 		}
 
 		// 5. 設定測試 router
-		gin.SetMode(gin.TestMode)
+		router := setupProblemTestRouter(testDB)
 
-		router := gin.New()
-		router.PUT("/api/problems", UpsertProblemHandler(testDB))
-
-		// 6. 寫上傳內容
-		body := &bytes.Buffer{}
-		writer := multipart.NewWriter(body)
-		
-		_ = writer.WriteField("problemCode", problemCode)
-		part, err := writer.CreateFormFile("file", filepath.Base(filename))
-		if err != nil {
-			t.Error(err)
-		}
-		_, err = io.Copy(part, file)
-		if err != nil {
-			t.Error(err)
-		}
-		_ = writer.Close()
-
-		// 7. Call API
+		// 6. Call API
 		w := httptest.NewRecorder()
-		req, _ := http.NewRequest("PUT", "/api/problems", body)
-		req.Header.Add("Content-Type", writer.FormDataContentType())
+		req := newProblemZipUploadRequest(t, filename)
 		router.ServeHTTP(w, req)
 
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d\nbody: %s", w.Code, w.Body.String())
 		}
 
-		// 8. 確認結果：資料庫以及資料夾更新成功
+		// 7. 確認結果：資料庫以及資料夾更新成功
 		problem := models.Problem{}
 		err = testDB.Where("problem_code = ?", problemCode).First(&problem).Error
-		if err != nil{ 
+		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-        		t.Fatalf("Problem didn't exist")
+				t.Fatalf("Problem didn't exist")
 			} else {
-        		t.Error(err)
+				t.Error(err)
 			}
 		}
-		if problem.LimitTime == 0 || problem.LimitTime != 1000{
+		if problem.LimitTime == 0 || problem.LimitTime != 1000 {
 			t.Fatalf("Failed to update Problem")
 		}
-		
+
 		// 確認資料夾更新
 		if _, err := os.Stat(filepath.Join(problemPath, "old.txt")); !os.IsNotExist(err) {
 			t.Fatalf("old file should be removed after update")
@@ -334,155 +322,88 @@ func TestUpsertProblemHandler(t *testing.T) {
 		if _, err := os.Stat(filepath.Join(problemPath, "template/new.txt")); os.IsNotExist(err) {
 			t.Fatalf("new file should exist after update")
 		}
-    })
+	})
 
 	t.Run("測試缺少任一資料", func(t *testing.T) {
 		// 1. 建立 Test DB
 		testDB := testutil.SetupTestDB(t)
 
 		// 2. 設定測試 router
-		gin.SetMode(gin.TestMode)
-
-		router := gin.New()
-		router.PUT("/api/problems", UpsertProblemHandler(testDB))
+		router := setupProblemTestRouter(testDB)
 
 		// 3. 測試每一種資料不存在的情況
-		filename := problemCode + ".zip"
-		var files = []File {
-			{"template/", ""}, 
-			{"solution/", ""}, 
-			{"spec/", ""}, 
+		files := []File{
+			{"template/", ""},
+			{"solution/", ""},
+			{"spec/", ""},
 			{"online-judge/", ""},
 			{"settings.yaml", settingsYAML},
 		}
 
-		for idx, _ := range files{
+		for idx := range files {
 			// 4. 建立上傳壓縮檔
 			tmpFiles := []File{}
-			for _idx, file := range files{
-				if idx == _idx{
+			for _idx, file := range files {
+				if idx == _idx {
 					continue
 				}
 				tmpFiles = append(tmpFiles, file)
 			}
-			CreateZipFileForTest(t, problemCode, tmpFiles)
+			filename := CreateZipFileForTest(t, problemCode, tmpFiles)
 
-			file, err := os.Open(filename)
-			if err != nil {
-				t.Error(err)
-			}
-			defer file.Close()
-
-			// 5. 寫上傳內容
-			body := &bytes.Buffer{}
-			writer := multipart.NewWriter(body)
-
-			_ = writer.WriteField("problemCode", problemCode)
-			part, err := writer.CreateFormFile("file", filepath.Base(filename))
-			if err != nil {
-				t.Error(err)
-			}
-			_, err = io.Copy(part, file)
-			if err != nil {
-				t.Error(err)
-			}
-			_ = writer.Close()
-
-			// 6. Call API
+			// 5. Call API
 			w := httptest.NewRecorder()
-			req, _ := http.NewRequest("PUT", "/api/problems", body)
-			req.Header.Add("Content-Type", writer.FormDataContentType())
+			req := newProblemZipUploadRequest(t, filename)
 			router.ServeHTTP(w, req)
 
-			// 7. 確認結果
+			// 6. 確認結果
 			if w.Code != http.StatusInternalServerError {
 				t.Fatalf("expected 500, got %d\nbody: %s", w.Code, w.Body.String())
 			}
 		}
-    })
+	})
 
 	t.Run("測試上傳的 settings.yaml 格式錯誤", func(t *testing.T) {
 		// 1. 建立 Test DB
 		testDB := testutil.SetupTestDB(t)
 
 		// 2. 設定測試 router
-		gin.SetMode(gin.TestMode)
-		router := gin.New()
-		router.PUT("/api/problems", UpsertProblemHandler(testDB))
+		router := setupProblemTestRouter(testDB)
 
 		// 3. 建立上傳壓縮檔
-		filename := problemCode + ".zip"
-		var files = []File {
-			{"template/", ""}, 
-			{"solution/", ""}, 
-			{"spec/", ""}, 
+		files := []File{
+			{"template/", ""},
+			{"solution/", ""},
+			{"spec/", ""},
 			{"online-judge/", ""},
 			{"settings.yaml", invalidSettingYAML},
 		}
-		CreateZipFileForTest(t, problemCode, files)
+		filename := CreateZipFileForTest(t, problemCode, files)
 
-		file, err := os.Open(filename)
-		if err != nil {
-			t.Error(err)
-		}
-		defer file.Close()
-
-		// 4. 寫上傳內容
-		body := &bytes.Buffer{}
-		writer := multipart.NewWriter(body)
-
-		_ = writer.WriteField("problemCode", problemCode)
-		part, err := writer.CreateFormFile("file", filepath.Base(filename))
-		if err != nil {
-			t.Error(err)
-		}
-		_, err = io.Copy(part, file)
-		if err != nil {
-			t.Error(err)
-		}
-		_ = writer.Close()
-
-		// 5. Call API
+		// 4. Call API
 		w := httptest.NewRecorder()
-		req, _ := http.NewRequest("PUT", "/api/problems", body)
-		req.Header.Add("Content-Type", writer.FormDataContentType())
+		req := newProblemZipUploadRequest(t, filename)
 		router.ServeHTTP(w, req)
 
-		// 6. 確認結果
+		// 5. 確認結果
 		if w.Code != http.StatusInternalServerError {
 			t.Fatalf("expected 500, got %d\nbody: %s", w.Code, w.Body.String())
 		}
-    })
+	})
 
-	t.Run("測試非 zip 檔案上傳", func(t *testing.T){
+	t.Run("測試非 zip 檔案上傳", func(t *testing.T) {
 		// 1. 建立 Test DB
 		testDB := testutil.SetupTestDB(t)
 
 		// 2. 設定測試 router
-		gin.SetMode(gin.TestMode)
-		router := gin.New()
-		router.PUT("/api/problems", UpsertProblemHandler(testDB))
+		router := setupProblemTestRouter(testDB)
 
-		// 3. 寫上傳內容
-		body := &bytes.Buffer{}
-		writer := multipart.NewWriter(body)
-
-		_ = writer.WriteField("problemCode", problemCode)
-
-		_, err := writer.CreateFormFile("file", "test.txt")
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		_ = writer.Close()
-
-		// 4. Call API
+		// 3. Call API
 		w := httptest.NewRecorder()
-		req, _ := http.NewRequest("PUT", "/api/problems", body)
-		req.Header.Add("Content-Type", writer.FormDataContentType())
+		req := newProblemUploadRequest(t, "test.txt", nil)
 		router.ServeHTTP(w, req)
 
-		// 5. 確認結果
+		// 4. 確認結果
 		if w.Code != http.StatusBadRequest {
 			t.Fatalf("expected 400, got %d\nbody: %s", w.Code, w.Body.String())
 		}
@@ -493,31 +414,14 @@ func TestUpsertProblemHandler(t *testing.T) {
 		testDB := testutil.SetupTestDB(t)
 
 		// 2. 設定測試 router
-		gin.SetMode(gin.TestMode)
-		router := gin.New()
-		router.PUT("/api/problems", UpsertProblemHandler(testDB))
+		router := setupProblemTestRouter(testDB)
 
-		// 3. 寫上傳內容
-		body := &bytes.Buffer{}
-		writer := multipart.NewWriter(body)
-
-		_ = writer.WriteField("problemCode", problemCode)
-
-		_, err := writer.CreateFormFile("file", "broken.zip")
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		_ = writer.Close()
-
-		// 4. Call API
+		// 3. Call API
 		w := httptest.NewRecorder()
-		req, _ := http.NewRequest("PUT", "/api/problems", body)
-		req.Header.Add("Content-Type", writer.FormDataContentType())
-
+		req := newProblemUploadRequest(t, "broken.zip", nil)
 		router.ServeHTTP(w, req)
 
-		// 5. 確認結果
+		// 4. 確認結果
 		if w.Code != http.StatusInternalServerError {
 			t.Fatalf("expected 500, got %d\nbody: %s", w.Code, w.Body.String())
 		}
@@ -525,38 +429,34 @@ func TestUpsertProblemHandler(t *testing.T) {
 
 }
 
-func TestDeleteProblemHandler(t *testing.T){
+func TestDeleteProblemHandler(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
 	t.Run("Delete Problem", func(t *testing.T) {
 		// 1. 建立 Test DB
 		testDB := testutil.SetupTestDB(t)
 
 		// 2. 設定測試 router
-		gin.SetMode(gin.TestMode)
-
-		router := gin.New()
-		router.DELETE("/api/problems/:problemId", DeleteProblemHandler(testDB))
+		router := setupProblemTestRouter(testDB)
 
 		// 3. 寫入資料
 		newProblem := models.Problem{
-			ProblemCode:	problemCode,
-			Title:			"Voyage Log",
-			LimitTime: 0,
-			ProblemPath:	"testfile/problem/114FinalQ006",
+			ProblemCode: problemCode,
+			Title:       "Voyage Log",
+			LimitTime:   0,
+			ProblemPath: "testfile/problem/114FinalQ006",
 		}
 		if err := testDB.Create(&newProblem).Error; err != nil {
 			t.Error(err)
 		}
 
-		// 4. 寫上傳內容
-		body := &bytes.Buffer{}
-
 		// 5. Call API 前，確認 Problem 114FinalQ006 存在
 		problem := models.Problem{}
 		err := testDB.Where("id = ?", newProblem.ID).First(&problem).Error
-		if err != nil{
+		if err != nil {
 			if !errors.Is(err, gorm.ErrRecordNotFound) {
-        		t.Error(err)
-			} else{
+				t.Error(err)
+			} else {
 				t.Fatalf("Problem didn't exist before deleting")
 			}
 		}
@@ -564,7 +464,7 @@ func TestDeleteProblemHandler(t *testing.T){
 		// 6. Call API
 		w := httptest.NewRecorder()
 		url := fmt.Sprintf("/api/problems/%d", newProblem.ID)
-		req, _ := http.NewRequest("DELETE", url, body)
+		req := httptest.NewRequest(http.MethodDelete, url, nil)
 		router.ServeHTTP(w, req)
 
 		// 7. 確認結果
@@ -574,13 +474,13 @@ func TestDeleteProblemHandler(t *testing.T){
 
 		problem = models.Problem{}
 		err = testDB.Where("id = ?", newProblem.ID).First(&problem).Error
-		if err == nil{
+		if err == nil {
 			t.Fatalf("Problem still exist after deleting")
-		} else { 
+		} else {
 			if !errors.Is(err, gorm.ErrRecordNotFound) {
-        		t.Error(err)
+				t.Error(err)
 			}
-		} 
+		}
 	})
 
 	t.Run("Problem 不存在", func(t *testing.T) {
@@ -588,17 +488,11 @@ func TestDeleteProblemHandler(t *testing.T){
 		testDB := testutil.SetupTestDB(t)
 
 		// 2. 設定測試 router
-		gin.SetMode(gin.TestMode)
+		router := setupProblemTestRouter(testDB)
 
-		router := gin.New()
-		router.DELETE("/api/problems/:problemId", DeleteProblemHandler(testDB))
-
-		// 3. 寫上傳內容
-		body := &bytes.Buffer{}
-
-		// 5. Call API
+		// 3. Call API
 		w := httptest.NewRecorder()
-		req, _ := http.NewRequest("DELETE", "/api/problems/1", body)
+		req := httptest.NewRequest(http.MethodDelete, "/api/problems/1", nil)
 		router.ServeHTTP(w, req)
 
 		// 4. 確認結果
@@ -608,7 +502,7 @@ func TestDeleteProblemHandler(t *testing.T){
 	})
 }
 
-func TestGetProblemTestCasesHandler(t *testing.T){
+func TestGetProblemTestCasesHandler(t *testing.T) {
 
 }
 
@@ -618,14 +512,15 @@ type File struct {
 }
 
 // 將傳入的檔案壓縮成一個 ZIP 檔
-func CreateZipFileForTest(t *testing.T, filename string, files []File){
+func CreateZipFileForTest(t *testing.T, filename string, files []File) string {
 	t.Helper()
 
-	archive, err := os.Create(filename + ".zip")
-    if err != nil {
-        t.Error(err)
-    }
-    defer archive.Close()
+	archivePath := filepath.Join(t.TempDir(), filename+".zip")
+	archive, err := os.Create(archivePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer archive.Close()
 
 	// Create a new zip archive.
 	zipWriter := zip.NewWriter(archive)
@@ -644,6 +539,8 @@ func CreateZipFileForTest(t *testing.T, filename string, files []File){
 	// Make sure to check the error on Close.
 	err = zipWriter.Close()
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
+
+	return archivePath
 }
