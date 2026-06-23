@@ -11,13 +11,13 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type TestSuite struct {
-	TestCases []TestCase `xml:"testcase"`
+type CTestSuiteResult struct {
+	TestCases []CTestCaseResult `xml:"testcase"`
 }
 
-type TestCase struct {
-	Name      string   `xml:"name,attr"`
-	SystemOut string   `xml:"system-out"`
+type CTestCaseResult struct {
+	Name      string `xml:"name,attr"`
+	SystemOut string `xml:"system-out"`
 }
 
 type ProblemSettings struct {
@@ -34,19 +34,26 @@ type Expected struct {
 }
 
 // 確認評測結果
-func checkTestResults(resultPath string, problemPath string) (bool, error) {
-	// 取得 result.xml 裡面的每個 testcase 的輸出結果
-	testCases, err := parseTestResult(resultPath)
-	if err != nil{
-		return false, err
-	}
-	testResults, err := loadExpectedOutputs(problemPath)
-	if err != nil{
+func checkTestResults(actualResultPath string, problemRoot string) (bool, error) {
+	// 取得 submission 的 result.xml 裡每個 testcase 的實際輸出
+	actualTestCases, err := parseActualTestResults(actualResultPath)
+	if err != nil {
 		return false, err
 	}
 
-	for _, testCase := range testCases{
-		if normalizeOutput(testCase.SystemOut) != normalizeOutput(testResults[testCase.Name]){
+	// 取得題目提供的每個 testcase 預期輸出
+	expectedOutputs, err := loadExpectedOutputs(problemRoot)
+	if err != nil {
+		return false, err
+	}
+
+	for _, actualTestCase := range actualTestCases {
+		expectedOutput, exists := expectedOutputs[actualTestCase.Name]
+		if !exists {
+			return false, fmt.Errorf("expected output not found for testcase %s", actualTestCase.Name)
+		}
+
+		if normalizeOutput(actualTestCase.SystemOut) != normalizeOutput(expectedOutput) {
 			return false, nil
 		}
 	}
@@ -54,16 +61,16 @@ func checkTestResults(resultPath string, problemPath string) (bool, error) {
 	return true, nil
 }
 
-// parse result.xml，取得每個 testcase 的輸出結果
-func parseTestResult(resultPath string) ([]TestCase, error) {
+// 解析 submission 的 result.xml，取得每個 testcase 的實際輸出
+func parseActualTestResults(actualResultPath string) ([]CTestCaseResult, error) {
 	// 讀取資料
-	resultFile, err := os.ReadFile(resultPath)
+	resultFile, err := os.ReadFile(actualResultPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read result file: %w", err)
 	}
 
 	// 取得 name 和 SystemOut 的內容
-	var suite TestSuite
+	var suite CTestSuiteResult
 	if err := xml.Unmarshal(resultFile, &suite); err != nil {
 		return nil, fmt.Errorf("failed to parse result file: %w", err)
 	}
@@ -71,10 +78,10 @@ func parseTestResult(resultPath string) ([]TestCase, error) {
 	return suite.TestCases, nil
 }
 
-// 從 problemPath 的 settings.yaml 找到每個 case 的正確輸出結果並回傳
-func loadExpectedOutputs(problemPath string) (map[string]string, error) {
+// 從題目根目錄的 settings.yaml 找到每個 testcase 的預期輸出
+func loadExpectedOutputs(problemRoot string) (map[string]string, error) {
 	// 讀取 settings.yaml
-	settingsPath := filepath.Join(problemPath, "settings.yaml")
+	settingsPath := filepath.Join(problemRoot, "settings.yaml")
 
 	settingsFile, err := os.ReadFile(settingsPath)
 	if err != nil {
@@ -92,7 +99,7 @@ func loadExpectedOutputs(problemPath string) (map[string]string, error) {
 
 	for _, preset := range settings.Presets {
 		// 正確輸出的位置
-		expectedPath := filepath.Join(problemPath, preset.Expected.Value)
+		expectedPath := filepath.Join(problemRoot, preset.Expected.Value)
 
 		// 讀取正確輸出
 		content, err := os.ReadFile(expectedPath)

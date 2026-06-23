@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"time"
 
 	"gorm.io/gorm"
@@ -31,6 +30,13 @@ func runJudgingProcess(db *gorm.DB, submissionId string) {
 	submission.SourcePath = filepath.Join("uploads", path) + ".zip"
 	submission.WorkspacePath = filepath.Join("tmp", "upload", path, "workspace")
 	logPath := filepath.Join("tmp", "upload", path, "logs")
+
+	// 清除 submission.WorkspacePath 目錄
+	if err := os.RemoveAll(submission.WorkspacePath); err != nil {
+		finishSubmission(db, submission, "SE", "Failed to clean workspace: "+err.Error())
+		appendInternalJudgeErrorLog(submissionId, "Failed to clean workspace: "+err.Error())
+		return
+	}
 
 	// 2. 解壓縮上傳的 zip 檔案到 submission.WorkspacePath 目錄下
 	if err := prepareWorkspace(submission); err != nil {
@@ -276,6 +282,15 @@ func runDockerRun(submission *models.Submission) error {
 
 	containerName := "judge-run-" + submission.OperatorID
 
+	// 將 limit time 的單位 ms 轉換成 s
+	if submission.Problem.LimitTime <= 0 {
+		return fmt.Errorf("invalid time limit: %d ms", submission.Problem.LimitTime)
+	}
+	timeoutValue := fmt.Sprintf(
+		"%.3fs",
+		float64(submission.Problem.LimitTime)/1000,
+	)
+
 	// -v 把資料夾掛載到容器內的 /workspace 和 /problem
 	// -w 進入容器後，工作目錄直接設為 /workspace
 	cmd := exec.Command(
@@ -285,7 +300,7 @@ func runDockerRun(submission *models.Submission) error {
 		"-v", abProblemPath+":/problem",
 		"-w", "/workspace",
 		"yhlib/cs3060701",
-		"timeout", strconv.Itoa(submission.Problem.LimitTime)+"s",
+		"timeout", timeoutValue,
 		"ctest", "-Q", "--test-dir", "build", "--output-junit", "result.xml",
 	)
 
