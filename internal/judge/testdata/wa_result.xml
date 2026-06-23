@@ -1,0 +1,7 @@
+<testsuite>
+	<testcase name="case1" classname="case1" time="0.001" status="run">
+		<system-out>Valid: different-output
+Suite: sample
+Has 1 Checkpoint, PASSED</system-out>
+	</testcase>
+</testsuite>

@@ -1,0 +1,7 @@
+presets:
+  - expected:
+      type: file-content
+      value: online-judge/case1
+  - expected:
+      type: file-content
+      value: online-judge/case2

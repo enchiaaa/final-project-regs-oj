@@ -1,0 +1,12 @@
+<testsuite>
+	<testcase name="case1" classname="case1" time="0.001" status="run">
+		<system-out>Valid: sample-case-1
+Suite: sample
+Has 1 Checkpoint, PASSED</system-out>
+	</testcase>
+	<testcase name="case2" classname="case2" time="0.001" status="run">
+		<system-out>Valid: sample-case-2
+Suite: sample
+Has 2 Checkpoints, PASSED</system-out>
+	</testcase>
+</testsuite>

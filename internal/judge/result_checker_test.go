@@ -6,8 +6,8 @@ import (
 )
 
 func TestCheckTestResults_AllOutputsMatch(t *testing.T) {
-	problemRoot := filepath.Join("..", "..", "problem", "114FinalQ001")
-	actualResultPath := filepath.Join(problemRoot, "online-judge", "result.xml")
+	problemRoot := filepath.Join("testdata", "ac_problem")
+	actualResultPath := filepath.Join("testdata", "ac_result.xml")
 
 	verdict, err := checkTestResults(actualResultPath, problemRoot)
 
@@ -21,8 +21,8 @@ func TestCheckTestResults_AllOutputsMatch(t *testing.T) {
 }
 
 func TestCheckTestResults_OutputMismatch(t *testing.T) {
-	problemRoot := filepath.Join("..", "..", "problem", "114FinalQ001")
-	actualResultPath := filepath.Join("..", "..", "problem", "114FinalQ002", "online-judge", "result.xml")
+	problemRoot := filepath.Join("testdata", "ac_problem")
+	actualResultPath := filepath.Join("testdata", "wa_result.xml")
 
 	verdict, err := checkTestResults(actualResultPath, problemRoot)
 	if err != nil {
@@ -35,8 +35,22 @@ func TestCheckTestResults_OutputMismatch(t *testing.T) {
 }
 
 func TestCheckTestResults_RuntimeError(t *testing.T) {
-	problemRoot := filepath.Join("..", "..", "problem", "114FinalQ001")
+	problemRoot := filepath.Join("testdata", "ac_problem")
 	actualResultPath := filepath.Join("testdata", "re_result.xml")
+
+	verdict, err := checkTestResults(actualResultPath, problemRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if verdict != "RE" {
+		t.Fatalf("expected RE, got %s", verdict)
+	}
+}
+
+func TestCheckTestResults_EmptyTestCases(t *testing.T) {
+	problemRoot := filepath.Join("testdata", "ac_problem")
+	actualResultPath := filepath.Join("testdata", "empty_result.xml")
 
 	verdict, err := checkTestResults(actualResultPath, problemRoot)
 	if err != nil {
