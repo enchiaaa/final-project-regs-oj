@@ -1,0 +1,749 @@
+openapi: 3.0.3
+
+info:
+  title: REGS Online Judge API
+  version: 1.0.0
+  description: |
+    REGS Online Judge 後端 API。
+
+    需要驗證的 API 請在 Authorization Header 帶入：
+    `Bearer <JWT>`
+
+servers:
+  - url: http://localhost:8080
+    description: 本機開發環境
+
+tags:
+  - name: Users
+    description: 使用者註冊、登入與資料查詢
+  - name: Problems
+    description: 題目查詢與管理
+  - name: Submissions
+    description: 程式提交、結果與日誌查詢
+  - name: Statistics
+    description: 題目與使用者統計
+
+paths:
+  /api/users/register:
+    post:
+      tags: [Users]
+      summary: 註冊使用者
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserCredentials"
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/UserCredentials"
+      responses:
+        "201":
+          description: 註冊成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  user:
+                    type: string
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          description: Username 已存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/users/login:
+    post:
+      tags: [Users]
+      summary: 使用者登入並取得 JWT
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserCredentials"
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/UserCredentials"
+      responses:
+        "200":
+          description: 登入成功
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message, user, token]
+                properties:
+                  message:
+                    type: string
+                  user:
+                    type: string
+                  token:
+                    type: string
+                    description: ES256 JWT
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/users/logout:
+    post:
+      tags: [Users]
+      summary: 登出目前使用者
+      description: |
+        驗證 JWT 後回傳登出成功。
+        本系統使用 stateless JWT，後端不保存或撤銷 token；
+        Client 收到成功回應後，應移除本地保存的 JWT。
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: 登出成功，Client 應移除本地 JWT
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: string
+                    example: Logout successfully
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/users/me:
+    get:
+      tags: [Users]
+      summary: 取得目前登入使用者資料
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: 使用者資料
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/users/{userId}/submissions:
+    get:
+      tags: [Users]
+      summary: 取得指定使用者的公開提交紀錄
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "200":
+          description: 簡化後的提交紀錄
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [user_id, submissions]
+                properties:
+                  user_id:
+                    type: string
+                  submissions:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PublicUserSubmission"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/problems:
+    get:
+      tags: [Problems]
+      summary: 取得題目列表
+      responses:
+        "200":
+          description: 題目列表
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [problems]
+                properties:
+                  problems:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ProblemListItem"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    put:
+      tags: [Problems]
+      summary: 建立或更新題目
+      description: 僅限 Admin。上傳的 ZIP 必須包含 template、solution、spec、online-judge 與 settings.yaml。
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [problemCode, file]
+              properties:
+                problemCode:
+                  type: string
+                  example: 114FinalQ001
+                file:
+                  type: string
+                  format: binary
+                  description: 題目 ZIP
+      responses:
+        "200":
+          description: 建立或更新成功
+          content:
+            application/json:
+              schema:
+                type: string
+                example: ok
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/problems/{problemId}:
+    get:
+      tags: [Problems]
+      summary: 取得單一題目資料
+      parameters:
+        - $ref: "#/components/parameters/ProblemId"
+      responses:
+        "200":
+          description: 題目資料
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Problems]
+      summary: 刪除題目資料
+      description: 僅限 Admin。目前刪除資料庫紀錄，不保證同步移除題目實體目錄。
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ProblemId"
+      responses:
+        "200":
+          description: 刪除成功
+          content:
+            application/json:
+              schema:
+                type: string
+                example: ok
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/problems/{problemId}/testcases:
+    get:
+      tags: [Problems]
+      summary: 下載完整題目測資 ZIP
+      description: 僅限 Admin。
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ProblemId"
+      responses:
+        "200":
+          description: 題目壓縮檔
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/submissions:
+    post:
+      tags: [Submissions]
+      summary: 上傳程式並建立非同步評測任務
+      description: 建立後狀態為 Pending，並立即將 operatorId 回傳給 Client。
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [problemCode, file]
+              properties:
+                problemCode:
+                  type: string
+                  example: 114FinalQ001
+                file:
+                  type: string
+                  format: binary
+                  description: 使用者提交的 ZIP
+      responses:
+        "200":
+          description: Submission 已建立並加入佇列
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [OperatorId]
+                properties:
+                  OperatorId:
+                    type: string
+                    format: uuid
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    get:
+      tags: [Submissions]
+      summary: 取得目前登入使用者的提交紀錄
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: 提交紀錄
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [submissions]
+                properties:
+                  submissions:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Submission"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/submissions/{operatorId}:
+    get:
+      tags: [Submissions]
+      summary: 取得單一提交的評測結果
+      description: User 僅能查看自己的 Submission，Admin 可查看所有 Submission。
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/OperatorId"
+      responses:
+        "200":
+          description: 評測結果
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubmissionResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/submissions/{operatorId}/rerun:
+    post:
+      tags: [Submissions]
+      summary: 重新執行既有 Submission
+      description: |
+        使用原本上傳的 ZIP 與 operatorId，將已結束的 Submission
+        狀態改回 Pending 並重新加入背景評測佇列。
+
+        User 只能重新執行自己的 Submission，Admin 可以重新執行所有 Submission。
+        Pending、Configuring、Compiling、Judging 狀態不可重複加入佇列。
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/OperatorId"
+      responses:
+        "202":
+          description: Submission 已重新加入評測佇列
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RerunSubmissionResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Submission 已在排隊或執行中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: Submission is already queued or running
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/submissions/{operatorId}/source:
+    get:
+      tags: [Submissions]
+      summary: 下載提交的原始 ZIP
+      description: User 僅能下載自己的 Submission，Admin 可下載所有 Submission。
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/OperatorId"
+      responses:
+        "200":
+          description: 原始 ZIP
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/submissions/{operatorId}/logs/{logType}:
+    get:
+      tags: [Submissions]
+      summary: 取得指定階段的評測日誌
+      description: User 僅能查看自己的 Submission，Admin 可查看所有 Submission。
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/OperatorId"
+        - name: logType
+          in: path
+          required: true
+          description: 日誌階段
+          schema:
+            type: string
+            enum: [configure, compile, output]
+      responses:
+        "200":
+          description: 日誌內容
+          content:
+            text/plain:
+              schema:
+                type: string
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/stats/problems/{problemId}:
+    get:
+      tags: [Statistics]
+      summary: 取得題目統計資料
+      parameters:
+        - $ref: "#/components/parameters/ProblemId"
+      responses:
+        "200":
+          description: 題目統計資料
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemStats"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/stats/users/{userId}:
+    get:
+      tags: [Statistics]
+      summary: 取得使用者統計資料
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "200":
+          description: 使用者統計資料
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserStats"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+    ProblemId:
+      name: problemId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+    OperatorId:
+      name: operatorId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    BadRequest:
+      description: Request 格式錯誤或指定資源無效
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unauthorized:
+      description: JWT 缺失、格式錯誤或已失效
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Forbidden:
+      description: 已登入，但沒有操作權限或不是資源擁有者
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: 找不到指定資源
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    InternalServerError:
+      description: 伺服器內部錯誤
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+
+    UserCredentials:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          example: B11132003
+        password:
+          type: string
+          format: password
+          minLength: 1
+
+    UserProfile:
+      type: object
+      required: [user_id, username, role]
+      properties:
+        user_id:
+          type: integer
+          format: int64
+        username:
+          type: string
+        role:
+          type: string
+          enum: [User, Admin]
+
+    ProblemListItem:
+      type: object
+      required: [problemCode, title]
+      properties:
+        problemCode:
+          type: string
+        title:
+          type: string
+
+    ProblemDetail:
+      allOf:
+        - $ref: "#/components/schemas/ProblemListItem"
+        - type: object
+          required: [limitTime]
+          properties:
+            limitTime:
+              type: integer
+              description: 執行時間限制，單位為毫秒
+              example: 1000
+
+    PublicUserSubmission:
+      type: object
+      required: [problemCode, status]
+      properties:
+        problemCode:
+          type: string
+        status:
+          $ref: "#/components/schemas/SubmissionStatus"
+
+    Submission:
+      type: object
+      properties:
+        ID:
+          type: integer
+          format: int64
+        CreatedAt:
+          type: string
+          format: date-time
+        UpdatedAt:
+          type: string
+          format: date-time
+        DeletedAt:
+          nullable: true
+        operatorId:
+          type: string
+          format: uuid
+        user_id:
+          type: integer
+          format: int64
+        problem_id:
+          type: integer
+          format: int64
+        status:
+          $ref: "#/components/schemas/SubmissionStatus"
+        message:
+          type: string
+
+    SubmissionResult:
+      type: object
+      required: [OperatorId, Username, ProblemCode, Status, Message]
+      properties:
+        OperatorId:
+          type: string
+          format: uuid
+        Username:
+          type: string
+        ProblemCode:
+          type: string
+        Status:
+          $ref: "#/components/schemas/SubmissionStatus"
+        Message:
+          type: string
+
+    RerunSubmissionResponse:
+      type: object
+      required: [operatorId, status, message]
+      properties:
+        operatorId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [Pending]
+        message:
+          type: string
+          example: Submission queued for rerun
+
+    SubmissionStatus:
+      type: string
+      enum:
+        - Pending
+        - Configuring
+        - Compiling
+        - Judging
+        - AC
+        - WA
+        - CE
+        - RE
+        - TLE
+        - SE
+
+    StatusCounts:
+      type: object
+      additionalProperties:
+        type: integer
+        format: int64
+      example:
+        AC: 5
+        WA: 3
+        CE: 1
+
+    ProblemStats:
+      type: object
+      required: [problemId, problemCode, title, totalSubmissions, statusCounts]
+      properties:
+        problemId:
+          type: integer
+          format: int64
+        problemCode:
+          type: string
+        title:
+          type: string
+        totalSubmissions:
+          type: integer
+          format: int64
+        statusCounts:
+          $ref: "#/components/schemas/StatusCounts"
+
+    UserStats:
+      type: object
+      required: [userId, username, totalSubmissions, statusCounts]
+      properties:
+        userId:
+          type: integer
+          format: int64
+        username:
+          type: string
+        totalSubmissions:
+          type: integer
+          format: int64
+        statusCounts:
+          $ref: "#/components/schemas/StatusCounts"
