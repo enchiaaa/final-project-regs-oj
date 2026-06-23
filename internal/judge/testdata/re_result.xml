@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="(empty)"
+	tests="5"
+	failures="5"
+	disabled="0"
+	skipped="0"
+	hostname=""
+	time="0"
+	timestamp="2026-06-23T14:29:29"
+	>
+	<testcase name="case1" classname="case1" time="0.0265955" status="fail">
+		<failure message="Subprocess aborted"/>
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="case2" classname="case2" time="0.0250619" status="fail">
+		<failure message="Subprocess aborted"/>
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="case3" classname="case3" time="0.0245871" status="fail">
+		<failure message="Subprocess aborted"/>
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="case4" classname="case4" time="0.0239563" status="fail">
+		<failure message="Subprocess aborted"/>
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="case5" classname="case5" time="0.0261953" status="fail">
+		<failure message="Subprocess aborted"/>
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+</testsuite>

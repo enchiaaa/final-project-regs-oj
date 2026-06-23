@@ -2,6 +2,7 @@
 package judge
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -109,18 +110,23 @@ func runJudgingProcess(db *gorm.DB, submissionId string) {
 
 	// 若 result.xml 存在
 	if _, resultErr := os.Stat(resultPath); resultErr == nil {
-		ok, err := checkTestResults(resultPath, submission.Problem.ProblemPath)
+		verdict, err := checkTestResults(resultPath, submission.Problem.ProblemPath)
 		if err != nil {
 			finishSubmission(db, submission, "RE", "Failed to check test results: "+err.Error())
 			return
 		}
 
-		if !ok {
+		mustWriteLog(submissionId, submission.OutputLogPath, "Verdict: "+verdict+"\n")
+		switch verdict {
+		case "AC":
+			finishSubmission(db, submission, "AC", "Accepted")
+		case "WA":
 			finishSubmission(db, submission, "WA", "Some test cases failed")
-			return
+		case "RE":
+			finishSubmission(db, submission, "RE", "Runtime error")
+		default:
+			finishSubmission(db, submission, "RE", "Unknown judge result")
 		}
-
-		finishSubmission(db, submission, "AC", "Accepted")
 		return
 	}
 
@@ -290,18 +296,22 @@ func runDockerRun(submission *models.Submission) error {
 		"%.3fs",
 		float64(submission.Problem.LimitTime)/1000,
 	)
+	outerTimeout := time.Duration(submission.Problem.LimitTime)*time.Millisecond + 2*time.Second
+	ctx, cancel := context.WithTimeout(context.Background(), outerTimeout)
+	defer cancel()
 
 	// -v 把資料夾掛載到容器內的 /workspace 和 /problem
 	// -w 進入容器後，工作目錄直接設為 /workspace
-	cmd := exec.Command(
+	cmd := exec.CommandContext(
+		ctx,
 		"docker", "run", "--name", containerName, "--rm",
 		"--network", "none",
 		"-v", abwsWorkspace+":/workspace",
 		"-v", abProblemPath+":/problem",
 		"-w", "/workspace",
 		"yhlib/cs3060701",
-		"timeout", timeoutValue,
-		"ctest", "-Q", "--test-dir", "build", "--output-junit", "result.xml",
+		"timeout", "--kill-after=1s", timeoutValue,
+		"ctest", "--test-dir", "build", "--output-on-failure", "--output-junit", "result.xml",
 	)
 
 	// 將 run 的輸出寫入 output.log 檔案中
@@ -310,8 +320,16 @@ func runDockerRun(submission *models.Submission) error {
 		return fmt.Errorf("failed to write output log: %w", writeErr)
 	}
 
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cleanupCancel()
+		_ = exec.CommandContext(cleanupCtx, "docker", "rm", "-f", containerName).Run()
+		return errTimeLimitExceeded
+	}
+
 	if exitErr, ok := err.(*exec.ExitError); ok {
-		if exitErr.ExitCode() == 124 {
+		exitCode := exitErr.ExitCode()
+		if exitCode == 124 || exitCode == 137 {
 			_ = exec.Command("docker", "rm", "-f", containerName).Run()
 			return errTimeLimitExceeded
 		}

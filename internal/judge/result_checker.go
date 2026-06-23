@@ -16,10 +16,14 @@ type CTestSuiteResult struct {
 }
 
 type CTestCaseResult struct {
-	Name      string `xml:"name,attr"`
-	SystemOut string `xml:"system-out"`
+	Name      string        `xml:"name,attr"`
+	Status    string        `xml:"status,attr"`
+	Failure   *CTestFailure `xml:"failure"`
+	SystemOut string        `xml:"system-out"`
 }
-
+type CTestFailure struct {
+	Message string `xml:"message,attr"`
+}
 type ProblemSettings struct {
 	Presets []Preset `yaml:"presets"`
 }
@@ -34,31 +38,39 @@ type Expected struct {
 }
 
 // 確認評測結果
-func checkTestResults(actualResultPath string, problemRoot string) (bool, error) {
+func checkTestResults(actualResultPath string, problemRoot string) (string, error) {
 	// 取得 submission 的 result.xml 裡每個 testcase 的實際輸出
 	actualTestCases, err := parseActualTestResults(actualResultPath)
 	if err != nil {
-		return false, err
+		return "", err
 	}
 
 	// 取得題目提供的每個 testcase 預期輸出
 	expectedOutputs, err := loadExpectedOutputs(problemRoot)
 	if err != nil {
-		return false, err
+		return "", err
 	}
 
 	for _, actualTestCase := range actualTestCases {
+		if isRuntimeError(actualTestCase) {
+			return "RE", nil
+		}
+
 		expectedOutput, exists := expectedOutputs[actualTestCase.Name]
 		if !exists {
-			return false, fmt.Errorf("expected output not found for testcase %s", actualTestCase.Name)
+			return "", fmt.Errorf("expected output not found for testcase %s", actualTestCase.Name)
 		}
 
 		if normalizeOutput(actualTestCase.SystemOut) != normalizeOutput(expectedOutput) {
-			return false, nil
+			return "WA", nil
 		}
 	}
 
-	return true, nil
+	if len(actualTestCases) == 0 {
+		return "RE", nil
+	}
+
+	return "AC", nil
 }
 
 // 解析 submission 的 result.xml，取得每個 testcase 的實際輸出
@@ -120,4 +132,27 @@ func normalizeOutput(s string) string {
 	s = strings.ReplaceAll(s, "\r\n", "\n")
 	s = strings.TrimSpace(s)
 	return s
+}
+
+// 查看 ErrorMessages，確認是否為 RE
+func isRuntimeError(testCase CTestCaseResult) bool {
+	if testCase.Failure == nil {
+		return false
+	}
+
+	message := strings.ToLower(testCase.Failure.Message)
+
+	runtimeErrorMessages := []string{
+		"subprocess aborted",
+		"segfault",
+		"segmentation fault",
+	}
+
+	for _, runtimeErrorMessage := range runtimeErrorMessages {
+		if strings.Contains(message, runtimeErrorMessage) {
+			return true
+		}
+	}
+
+	return false
 }
