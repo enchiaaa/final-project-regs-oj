@@ -38,8 +38,8 @@ func CreateSubmissionHandler(db *gorm.DB, jobQueue chan string) gin.HandlerFunc 
 		}
 
 		// 檢查上傳的檔案，並儲存到指定路徑 "uploads/{userName}/{problemCode}/{operatorId}.zip"
-		dst := filepath.Join("uploads", user.Username, problemCode, operatorId + ".zip")
-		if statusCode, err := SaveUploadedZipFile(c, "file", dst); err != nil{
+		dst := filepath.Join("uploads", user.Username, problemCode, operatorId+".zip")
+		if statusCode, err := SaveUploadedZipFile(c, "file", dst); err != nil {
 			c.JSON(statusCode, gin.H{"error": err.Error()})
 			return
 		}
@@ -90,7 +90,7 @@ func GetSubmissionResultHandler(db *gorm.DB) gin.HandlerFunc {
 		}
 
 		// 確認 ownership
-		if !CanAccessUserResource(c, submission.UserID){
+		if !CanAccessUserResource(c, submission.UserID) {
 			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 			return
 		}
@@ -116,7 +116,7 @@ func GetSubmissionSourceHandler(db *gorm.DB) gin.HandlerFunc {
 		}
 
 		// 確認 ownership
-		if !CanAccessUserResource(c, submission.UserID){
+		if !CanAccessUserResource(c, submission.UserID) {
 			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 			return
 		}
@@ -138,7 +138,7 @@ func GetSubmissionLogHandler(db *gorm.DB) gin.HandlerFunc {
 		}
 
 		// 確認 ownership
-		if !CanAccessUserResource(c, submission.UserID){
+		if !CanAccessUserResource(c, submission.UserID) {
 			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 			return
 		}
@@ -164,5 +164,51 @@ func GetSubmissionLogHandler(db *gorm.DB) gin.HandlerFunc {
 		}
 
 		c.String(http.StatusOK, string(content))
+	}
+}
+
+// /api/submissions/:operatorId/rerun
+func RerunSubmissionHandler(db *gorm.DB, jobQueue chan string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// 1. 找 submission
+		operatorId := c.Param("operatorId")
+
+		submission := models.Submission{}
+		if err := db.Where("operator_id = ?", operatorId).First(&submission).Error; err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Submission not found"})
+			return
+		}
+
+		// 2. 確認 ownership
+		if !CanAccessUserResource(c, submission.UserID) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+			return
+		}
+
+		// 3. 確認 submission status
+		if submission.Status == "Pending" || submission.Status == "Configuring" || submission.Status == "Compiling" || submission.Status == "Judging" {
+			c.JSON(http.StatusConflict, gin.H{"error": "Submission is already queued or running"})
+			return
+		}
+
+		// 4. rerun
+		submission.Status = "Pending"
+		submission.Message = ""
+
+		if err := db.Save(&submission).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "Failed to queue submission",
+			})
+			return
+		}
+
+		jobQueue <- operatorId
+
+		// 5. 回傳
+		c.JSON(http.StatusAccepted, gin.H{
+			"operatorId": submission.OperatorID,
+			"status":     "Pending",
+			"message":    "Submission queued for rerun",
+		})
 	}
 }

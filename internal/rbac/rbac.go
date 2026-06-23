@@ -10,6 +10,7 @@ var AllPermissions = []string{
 	PermissionSubmissionRead,
 	PermissionSubmissionSourceRead,
 	PermissionSubmissionLogRead,
+	PermissionSubmissionRerun,
 
 	PermissionUserRead,
 }
@@ -25,6 +26,7 @@ var RolePermissions = map[string][]string{
 		PermissionSubmissionRead,
 		PermissionSubmissionSourceRead,
 		PermissionSubmissionLogRead,
+		PermissionSubmissionRerun,
 
 		PermissionUserRead,
 	},
@@ -36,6 +38,7 @@ var RolePermissions = map[string][]string{
 		PermissionSubmissionRead,
 		PermissionSubmissionSourceRead,
 		PermissionSubmissionLogRead,
+		PermissionSubmissionRerun,
 
 		PermissionUserRead,
 	},

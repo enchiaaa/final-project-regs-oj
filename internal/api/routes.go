@@ -14,7 +14,7 @@ func RegisterRoutes(router *gin.Engine, db *gorm.DB, jobQueue chan string) {
 	// 使用者相關
 	router.POST("/api/users/register", UserRegisterHandler(db))
 	router.POST("/api/users/login", UserLoginHandler(db))
-	router.POST("/api/users/logout", middleware.AuthMiddleware(), UserLogoutHandler(db))
+	router.POST("/api/users/logout", middleware.AuthMiddleware(), UserLogoutHandler())
 	router.GET("/api/users/me", middleware.AuthMiddleware(), middleware.RequirePermission(db, rbac.PermissionUserRead), GetUserProfileHandler(db))
 	router.GET("/api/users/:userId/submissions", GetUserSubmissionsHandler(db))
 
@@ -30,6 +30,7 @@ func RegisterRoutes(router *gin.Engine, db *gorm.DB, jobQueue chan string) {
 	router.GET("/api/submissions/:operatorId/source", middleware.AuthMiddleware(), middleware.RequirePermission(db, rbac.PermissionSubmissionSourceRead), GetSubmissionSourceHandler(db))
 	router.GET("/api/submissions/:operatorId/logs/:logType", middleware.AuthMiddleware(), middleware.RequirePermission(db, rbac.PermissionSubmissionLogRead), GetSubmissionLogHandler(db))
 	router.GET("/api/submissions/:operatorId", middleware.AuthMiddleware(), middleware.RequirePermission(db, rbac.PermissionSubmissionRead), GetSubmissionResultHandler(db))
+	router.POST("/api/submissions/:operatorId/rerun", middleware.AuthMiddleware(), middleware.RequirePermission(db, rbac.PermissionSubmissionRerun), RerunSubmissionHandler(db, jobQueue))
 	router.GET("/api/submissions", middleware.AuthMiddleware(), middleware.RequirePermission(db, rbac.PermissionSubmissionRead), GetSubmissionsHandler(db))
 
 	// 統計相關
