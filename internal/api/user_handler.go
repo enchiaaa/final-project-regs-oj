@@ -45,12 +45,14 @@ func UserRegisterHandler(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
+		// hash password
 		passwordHash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to hash password"})
 			return
 		}
 
+		// 建立 newUser
 		userRole := models.Role{}
 		if err := db.Where("name = ?", "User").First(&userRole).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load default user role"})
@@ -67,6 +69,7 @@ func UserRegisterHandler(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
+		// 回傳
 		c.JSON(http.StatusCreated, gin.H{
 			"message": "User received successfully!",
 			"user":    req.Username,
@@ -111,6 +114,7 @@ func UserLoginHandler(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
+		// 回傳
 		c.JSON(http.StatusOK, gin.H{
 			"message": "User login successfully!",
 			"user":    existingUser.Username,
@@ -177,7 +181,7 @@ func GetUserSubmissionsHandler(db *gorm.DB) gin.HandlerFunc {
 
 		// 4. 回傳資料
 		c.JSON(http.StatusOK, gin.H{
-			"user_id":  userID,
+			"user_id":     userID,
 			"submissions": items,
 		})
 	}
