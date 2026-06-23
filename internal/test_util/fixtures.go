@@ -5,11 +5,23 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
+const TestPassword = "password"
+
 func CreateTestUser(t *testing.T, db *gorm.DB, username string) models.User {
 	t.Helper()
+
+	// hash password
+	passwordHash, err := bcrypt.GenerateFromPassword(
+		[]byte(TestPassword),
+		bcrypt.DefaultCost,
+	)
+	if err != nil {
+		t.Fatalf("failed to hash test password: %v", err)
+	}
 
 	role := models.Role{}
 	if err := db.Where("name = ?", "User").First(&role).Error; err != nil {
@@ -17,7 +29,7 @@ func CreateTestUser(t *testing.T, db *gorm.DB, username string) models.User {
 	}
 	user := models.User{
 		Username:     username,
-		PasswordHash: "password",
+		PasswordHash: string(passwordHash),
 		RoleID:       role.ID,
 	}
 
@@ -35,7 +47,7 @@ func CreateTestProblem(t *testing.T, db *gorm.DB, problemCode string) models.Pro
 		ProblemCode: problemCode,
 		Title:       "Test Problem",
 		LimitTime:   1000,
-		ProblemPath: "test/path",
+		ProblemPath: t.TempDir(),
 	}
 
 	if err := db.Create(&problem).Error; err != nil {
