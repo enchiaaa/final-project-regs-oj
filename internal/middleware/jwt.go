@@ -22,10 +22,10 @@ type Claims struct {
 }
 
 func privateKeyPath() (string, error) {
-	err := godotenv.Load()
-	if err != nil {
-		return "", errors.New("Error loading .env file")
+	if path := os.Getenv("JWT_PRIVATE_KEY_PATH"); path != "" {
+		return path, nil
 	}
+	_ = godotenv.Load()
 	if path := os.Getenv("JWT_PRIVATE_KEY_PATH"); path != "" {
 		return path, nil
 	}
@@ -33,10 +33,10 @@ func privateKeyPath() (string, error) {
 }
 
 func publicKeyPath() (string, error) {
-	err := godotenv.Load()
-	if err != nil {
-		return "", errors.New("Error loading .env file")
+	if path := os.Getenv("JWT_PUBLIC_KEY_PATH"); path != "" {
+		return path, nil
 	}
+	_ = godotenv.Load()
 	if path := os.Getenv("JWT_PUBLIC_KEY_PATH"); path != "" {
 		return path, nil
 	}

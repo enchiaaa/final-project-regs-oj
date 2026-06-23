@@ -3,17 +3,37 @@ package middleware
 import (
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
 )
 
+func projectRootForJWTTest(t *testing.T) string {
+	t.Helper()
+
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("failed to get current test file path")
+	}
+	return filepath.Clean(filepath.Join(filepath.Dir(file), "..", ".."))
+}
+
+func setupJWTKeyEnv(t *testing.T) {
+	t.Helper()
+
+	projectRoot := projectRootForJWTTest(t)
+
+	t.Setenv("JWT_PRIVATE_KEY_PATH", filepath.Join(projectRoot, "keys", "private.pem"))
+	t.Setenv("JWT_PUBLIC_KEY_PATH", filepath.Join(projectRoot, "keys", "public.pem"))
+}
+
 func TestAuthMiddlewareMissingHeader(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	t.Setenv("JWT_PRIVATE_KEY_PATH", "../../keys/private.pem")
-	t.Setenv("JWT_PUBLIC_KEY_PATH", "../../keys/public.pem")
+	setupJWTKeyEnv(t)
 
 	router := gin.New()
 	router.Use(AuthMiddleware())
