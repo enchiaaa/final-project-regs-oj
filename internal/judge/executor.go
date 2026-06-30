@@ -19,6 +19,11 @@ import (
 
 var errTimeLimitExceeded = errors.New("time limit exceeded")
 
+const (
+	appRootEnv               = "APP_ROOT"
+	dockerHostProjectRootEnv = "DOCKER_HOST_PROJECT_ROOT"
+)
+
 func runJudgingProcess(db *gorm.DB, submissionId string) {
 	// 1. 確認 submissionId 和 problem 是否存在
 	submission, err := loadSubmission(db, submissionId)
@@ -198,11 +203,11 @@ func finishSubmission(db *gorm.DB, submission *models.Submission, status string,
 
 // 使用 Docker 執行 configure 指令，並將輸出寫入 configure.log 檔案中
 func runDockerConfigure(submission *models.Submission) error {
-	absWorkspace, err := filepath.Abs(submission.WorkspacePath)
+	absWorkspace, err := dockerHostPath(submission.WorkspacePath)
 	if err != nil {
 		return err
 	}
-	abProblemPath, err := filepath.Abs(submission.Problem.ProblemPath)
+	abProblemPath, err := dockerHostPath(submission.Problem.ProblemPath)
 	if err != nil {
 		return err
 	}
@@ -240,11 +245,11 @@ func runDockerConfigure(submission *models.Submission) error {
 
 // 使用 Docker 執行 compile 指令，並將輸出寫入 compile.log 檔案中
 func runDockerCompile(submission *models.Submission) error {
-	absWorkspace, err := filepath.Abs(submission.WorkspacePath)
+	absWorkspace, err := dockerHostPath(submission.WorkspacePath)
 	if err != nil {
 		return err
 	}
-	abProblemPath, err := filepath.Abs(submission.Problem.ProblemPath)
+	abProblemPath, err := dockerHostPath(submission.Problem.ProblemPath)
 	if err != nil {
 		return err
 	}
@@ -277,11 +282,11 @@ func runDockerCompile(submission *models.Submission) error {
 
 // 使用 Docker 執行 run 指令，並將輸出寫入 output.log 檔案中
 func runDockerRun(submission *models.Submission) error {
-	abwsWorkspace, err := filepath.Abs(submission.WorkspacePath)
+	abwsWorkspace, err := dockerHostPath(submission.WorkspacePath)
 	if err != nil {
 		return err
 	}
-	abProblemPath, err := filepath.Abs(submission.Problem.ProblemPath)
+	abProblemPath, err := dockerHostPath(submission.Problem.ProblemPath)
 	if err != nil {
 		return err
 	}
@@ -345,6 +350,42 @@ func runDockerRun(submission *models.Submission) error {
 	}
 
 	return fmt.Errorf("result.xml not found")
+}
+
+// dockerHostPath 將 Server 容器內的專案路徑轉換為 Docker host 可見的路徑
+// 未設定容器部署環境變數時，維持本機開發原有的絕對路徑行為
+func dockerHostPath(path string) (string, error) {
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return "", err
+	}
+
+	appRoot := os.Getenv(appRootEnv)
+	hostRoot := os.Getenv(dockerHostProjectRootEnv)
+	if appRoot == "" && hostRoot == "" {
+		return absPath, nil
+	}
+	if appRoot == "" || hostRoot == "" {
+		return "", fmt.Errorf("%s and %s must be set together", appRootEnv, dockerHostProjectRootEnv)
+	}
+
+	absAppRoot, err := filepath.Abs(appRoot)
+	if err != nil {
+		return "", fmt.Errorf("resolve %s: %w", appRootEnv, err)
+	}
+	relPath, err := filepath.Rel(absAppRoot, absPath)
+	if err != nil {
+		return "", fmt.Errorf("resolve path relative to %s: %w", appRootEnv, err)
+	}
+	if relPath == ".." || filepath.IsAbs(relPath) || len(relPath) > 3 && relPath[:3] == ".."+string(filepath.Separator) {
+		return "", fmt.Errorf("path %q is outside %s %q", absPath, appRootEnv, absAppRoot)
+	}
+
+	absHostRoot, err := filepath.Abs(hostRoot)
+	if err != nil {
+		return "", fmt.Errorf("resolve %s: %w", dockerHostProjectRootEnv, err)
+	}
+	return filepath.Join(absHostRoot, relPath), nil
 }
 
 // 將評測過程中的錯誤訊息記錄到系統中，供管理員查看

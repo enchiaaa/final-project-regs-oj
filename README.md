@@ -78,88 +78,86 @@ yhlib/cs3060701
 
 ## 前置需求
 
-- Go
 - Docker Desktop 或 Docker Engine
 - Docker Compose
 - OpenSSL
-- PostgreSQL Client（選用）
 - Bash、`curl`、`jq`（執行 E2E 測試時需要）
-
-先確認 Docker 可正常使用：
-
-```bash
-docker version
-docker compose version
-```
-
-> 評測流程會由 Go 程式直接呼叫 `docker` CLI，因此 API Server 所在環境必須能存取 Docker daemon。
 
 ## 快速開始
 
-### 1. 啟動 PostgreSQL
+### 1. 產生 JWT 金鑰
 
-```bash
-docker compose up -d
-```
-
-本機使用 Docker Compose 時，請在 `.env` 設定資料庫連線：
-
-```dotenv
-DATABASE_URL=postgres://user:123@localhost:5432/OJ_db?sslmode=disable
-```
-
-程式會從 `DATABASE_URL` 讀取連線資訊。若要調整資料庫帳密或連線位置，請同步修改 `docker-compose.yml` 與 `.env`。
-
-### 2. 下載評測 Image
-
-```bash
-docker pull yhlib/cs3060701
-```
-
-### 3. 產生 JWT 金鑰
-
-在專案根目錄建立 `keys/`：
+在專案根目錄執行：
 
 ```bash
 mkdir -p keys
 openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out keys/private.pem
 openssl pkey -in keys/private.pem -pubout -out keys/public.pem
 ```
-### 4. 設定環境變數
+
+### 2. 設定 Admin
 
 ```bash
 cp .env.example .env
 ```
 
-`.env` 範例：
+編輯 `.env` 中的 Admin 帳密：
 
 ```dotenv
-DATABASE_URL=postgres://user:123@localhost:5432/OJ_db?sslmode=disable
-
-JWT_PRIVATE_KEY_PATH=keys/private.pem
-JWT_PUBLIC_KEY_PATH=keys/public.pem
-
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=change-me
 ```
 
-- JWT 金鑰路徑是相對於程式啟動目錄，請在專案根目錄執行 Server。
 - `ADMIN_USERNAME` 與 `ADMIN_PASSWORD` 必須同時設定。
 - 若兩者皆未設定，系統會略過預設 Admin 建立。
 - 若只設定其中一項，Server 啟動時會回報錯誤。
+- Compose 會直接設定容器內的資料庫與 JWT 金鑰路徑；`.env` 中的 `DATABASE_URL` 與 JWT 路徑保留給本機開發使用。
 
-### 5. 安裝 Dependencies 並啟動
+### 3. 建置並啟動 Stack
 
 ```bash
-go mod download
-go run ./cmd
+docker compose build
+docker compose up -d
 ```
 
-API 預設位址：
+Compose 會啟動：
+
+- `server`：由專案 `Dockerfile` 建置的 Go API Server。
+- `db`：PostgreSQL 16；通過 healthcheck 後 Server 才會啟動。
+- Judge 容器：收到評測工作時，由 Server 動態啟動 `yhlib/cs3060701`。
+
+查看服務狀態與 Server 日誌：
+
+```bash
+docker compose ps
+docker compose logs -f server
+```
+
+API 位址：
 
 ```text
 http://localhost:8080
 ```
+
+停止服務：
+
+```bash
+docker compose down
+```
+
+若要連同 PostgreSQL 資料一併刪除，可使用 `docker compose down -v`；此操作會永久刪除資料庫內容。
+
+### 本機開發模式
+
+若不把 API Server 放入容器，`.env` 的資料庫主機應使用 `localhost`，並先單獨啟動資料庫：
+
+```bash
+docker compose up -d db
+go mod download
+go run ./cmd
+```
+
+容器內的 Server 則使用 Compose service name `db` 連線，不可使用 `localhost`。
 
 啟動時會自動：
 

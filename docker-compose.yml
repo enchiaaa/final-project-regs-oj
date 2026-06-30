@@ -10,6 +10,39 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d OJ_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+  server:
+    image: regs-oj-server:local
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://user:123@db:5432/OJ_db?sslmode=disable
+      JWT_PRIVATE_KEY_PATH: /app/keys/private.pem
+      JWT_PUBLIC_KEY_PATH: /app/keys/public.pem
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      APP_ROOT: /app
+      DOCKER_HOST_PROJECT_ROOT: ${PWD}
+      GIN_MODE: debug
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./uploads:/app/uploads
+      - ./tmp:/app/tmp
+      - ./problem:/app/problem
+      - ./keys:/app/keys:ro
+      - /var/run/docker.sock:/var/run/docker.sock
 
 volumes:
   postgres_data:

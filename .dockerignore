@@ -1,0 +1,13 @@
+.git
+.gitignore
+.env
+keys/
+uploads/
+tmp/
+.gocache/
+.gotmp/
+test_files/
+scripts/
+docs/
+README.md
+docker-compose.yml
