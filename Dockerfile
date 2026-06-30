@@ -7,7 +7,7 @@ COPY internal ./internal
 RUN CGO_ENABLED=0 go build -o /out/regs-server ./cmd
 
 FROM alpine:3.23
-RUN apk add --no-cache ca-certificates
+RUN apk add --no-cache ca-certificates docker-cli tzdata
 WORKDIR /app
 COPY --from=builder /out/regs-server ./regs-server
 EXPOSE 8080
